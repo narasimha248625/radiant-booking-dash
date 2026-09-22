@@ -14,13 +14,173 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bookings: {
+        Row: {
+          amount: number
+          booking_code: string
+          created_at: string
+          id: string
+          player_name: string
+          slot_id: string
+          status: string
+          team_size: number
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          amount: number
+          booking_code: string
+          created_at?: string
+          id?: string
+          player_name: string
+          slot_id: string
+          status?: string
+          team_size: number
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          amount?: number
+          booking_code?: string
+          created_at?: string
+          id?: string
+          player_name?: string
+          slot_id?: string
+          status?: string
+          team_size?: number
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      slots: {
+        Row: {
+          capacity: number
+          court_label: string
+          created_at: string
+          duration_minutes: number
+          id: string
+          reserved_count: number
+          slot_date: string
+          start_time: string
+          status: string
+          updated_at: string
+          venue_id: string
+        }
+        Insert: {
+          capacity?: number
+          court_label: string
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          reserved_count?: number
+          slot_date: string
+          start_time: string
+          status?: string
+          updated_at?: string
+          venue_id: string
+        }
+        Update: {
+          capacity?: number
+          court_label?: string
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          reserved_count?: number
+          slot_date?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          venue_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slots_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venues: {
+        Row: {
+          active: boolean
+          amenities: string[]
+          created_at: string
+          description: string
+          featured: boolean
+          id: string
+          image_key: string
+          location: string
+          name: string
+          price_per_hour: number
+          rating: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amenities?: string[]
+          created_at?: string
+          description: string
+          featured?: boolean
+          id?: string
+          image_key?: string
+          location: string
+          name: string
+          price_per_hour: number
+          rating?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amenities?: string[]
+          created_at?: string
+          description?: string
+          featured?: boolean
+          id?: string
+          image_key?: string
+          location?: string
+          name?: string
+          price_per_hour?: number
+          rating?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_guest_booking: {
+        Args: {
+          p_player_name: string
+          p_slot_id: string
+          p_team_size: number
+          p_venue_id: string
+        }
+        Returns: {
+          booking_code: string
+          booking_status: string
+          total_amount: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
