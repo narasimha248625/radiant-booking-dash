@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowDown, ArrowRight, Check, ChevronLeft, ChevronRight, Clock3, MapPin, Menu, Minus, Moon, Plus, ShieldCheck, Sparkles, Star, Sun, Users, X } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, ChevronLeft, ChevronRight, Clock3, MapPin, Menu, Minus, Moon, Plus, ShieldCheck, Sparkles, Star, Sun, Users, X, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createBooking, getTurfData } from "@/lib/turf.functions";
 import heroImage from "@/assets/turf-hero.jpg";
@@ -109,7 +109,7 @@ function TurfPlay() {
 
         <section className="grid min-h-[70vh] bg-surface-inverse text-surface-inverse-foreground lg:grid-cols-2">
           <div className="relative min-h-[430px] overflow-hidden"><img src={actionImage} alt="Players competing on premium artificial turf" width={1408} height={912} loading="lazy" className="absolute inset-0 h-full w-full object-cover"/><div className="absolute inset-0 bg-[linear-gradient(0deg,oklch(0.10_0.01_120/0.65),transparent_60%)]"/><p className="absolute bottom-8 left-8 font-display text-7xl text-primary">NO EXCUSES.</p></div>
-          <div className="flex items-center p-8 lg:p-16"><div><p className="text-xs font-bold uppercase text-primary">Match-ready as standard</p><h2 className="mt-4 max-w-xl font-display text-6xl leading-[0.9] sm:text-8xl">EVERY DETAIL.<br/>GAME DAY READY.</h2><div className="mt-10 grid gap-px bg-surface-inverse-foreground/20 sm:grid-cols-2">{[[Sparkles,"Pro-grade turf"],[ShieldCheck,"Safety checked"],[Clock3,"Open till midnight"],[Users,"5v5 and 7v7"]].map(([Icon,label]) => <div key={String(label)} className="flex items-center gap-4 bg-surface-inverse p-5"><Icon className="text-primary"/><span className="font-bold uppercase">{String(label)}</span></div>)}</div></div></div>
+          <div className="flex items-center p-8 lg:p-16"><div><p className="text-xs font-bold uppercase text-primary">Match-ready as standard</p><h2 className="mt-4 max-w-xl font-display text-6xl leading-[0.9] sm:text-8xl">EVERY DETAIL.<br/>GAME DAY READY.</h2><div className="mt-10 grid gap-px bg-surface-inverse-foreground/20 sm:grid-cols-2">{([{ icon: Sparkles, label: "Pro-grade turf" },{ icon: ShieldCheck, label: "Safety checked" },{ icon: Clock3, label: "Open till midnight" },{ icon: Users, label: "5v5 and 7v7" }] satisfies { icon: LucideIcon; label: string }[]).map(({ icon: Icon, label }) => <div key={label} className="flex items-center gap-4 bg-surface-inverse p-5"><Icon className="text-primary"/><span className="font-bold uppercase">{label}</span></div>)}</div></div></div>
         </section>
 
         <section id="book" className="px-5 py-20 lg:px-8 lg:py-28">
