@@ -70,7 +70,7 @@ function TurfPlay() {
       <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
         <header className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
           <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 lg:h-20 lg:px-8">
-            <a href="#top" className="min-w-0 font-display text-3xl text-foreground"><span className="text-primary">TURF</span>//PLAY</a>
+            <a href="#top" className="min-w-0 font-sans text-xl font-bold text-foreground"><span className="text-primary">TURF</span>//PLAY</a>
             <div className="flex shrink-0 items-center gap-2">
               <nav className="hidden items-center gap-8 text-xs font-bold uppercase lg:flex"><a className="hover:text-primary" href="#arenas">Arenas</a><a className="hover:text-primary" href="#book">Live slots</a><a className="hover:text-primary" href="#status">My booking</a></nav>
               <Button size="icon" variant="ghost" aria-label={dark ? "Use light mode" : "Use dark mode"} onClick={() => setDark((value) => !value)}>{dark ? <Sun /> : <Moon />}</Button>
@@ -81,17 +81,34 @@ function TurfPlay() {
           {menuOpen && <nav className="grid border-t border-border bg-background p-5 text-xl font-bold uppercase lg:hidden"><a className="border-b border-border py-3" href="#arenas" onClick={() => setMenuOpen(false)}>Arenas</a><a className="border-b border-border py-3" href="#book" onClick={() => setMenuOpen(false)}>Live slots</a><a className="py-3" href="#status" onClick={() => setMenuOpen(false)}>My booking</a></nav>}
         </header>
 
-        <section id="top" className="relative flex min-h-[92svh] items-end overflow-hidden pt-20">
-          <img src={heroImage} alt="Football match under bright arena floodlights" width={1920} height={1088} className="absolute inset-0 h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,oklch(0.10_0.01_120/0.96)_0%,oklch(0.10_0.01_120/0.72)_42%,transparent_75%),linear-gradient(0deg,oklch(0.10_0.01_120/0.85),transparent_45%)]" />
-          <div className="relative mx-auto w-full max-w-7xl px-5 pb-12 pt-32 lg:px-8 lg:pb-16">
-            <div className="max-w-3xl reveal-up">
-              <div className="mb-6 flex items-center gap-3 text-xs font-bold uppercase text-primary"><span className="h-px w-10 bg-primary" /> Play after dark • Bengaluru</div>
-              <h1 className="font-display text-[clamp(5rem,13vw,11rem)] leading-[0.75] text-surface-inverse-foreground">OWN THE<br/><span className="text-primary">NIGHT.</span></h1>
-              <p className="mt-7 max-w-xl text-base leading-relaxed text-surface-inverse-foreground/75 sm:text-lg">Premium floodlit football arenas. Live availability, transparent prices, and instant confirmation.</p>
-              <div className="mt-8 flex flex-wrap gap-3"><Button size="lg" variant="sport" onClick={jumpToBooking}>Find a slot <ArrowDown /></Button><Button size="lg" variant="sportOutline" className="border-surface-inverse-foreground/30 bg-transparent text-surface-inverse-foreground hover:bg-surface-inverse-foreground hover:text-surface-inverse" onClick={() => document.querySelector("#arenas")?.scrollIntoView({ behavior: "smooth" })}>Explore arenas</Button></div>
+        <section id="top" className="relative min-h-[860px] overflow-hidden bg-hero pt-16 text-hero-foreground lg:min-h-[min(940px,100svh)] lg:pt-20">
+          <img src={heroImage} alt="Football match under bright arena floodlights" width={1920} height={1088} className="absolute inset-0 h-full w-full object-cover object-[64%_center]" />
+          <div className="hero-scrim absolute inset-0" />
+          <div className="relative mx-auto grid min-h-[calc(860px-4rem)] w-full max-w-7xl content-end gap-12 px-5 pb-8 pt-28 lg:min-h-[calc(min(940px,100svh)-5rem)] lg:grid-cols-[minmax(0,1.05fr)_minmax(390px,0.72fr)] lg:items-end lg:gap-16 lg:px-8 lg:pb-10">
+            <div className="reveal-up min-w-0">
+              <div className="mb-8 flex items-center gap-3 text-[11px] font-semibold uppercase text-primary"><span className="h-px w-12 bg-primary" /> The night fixture · Bengaluru</div>
+              <h1 className="max-w-3xl font-display text-6xl leading-[0.88] sm:text-7xl lg:text-[6.7rem]">Where the city<br/><em className="font-normal text-primary">comes to play.</em></h1>
+              <p className="mt-7 max-w-lg text-sm leading-7 text-hero-muted sm:text-base">Curated floodlit arenas, considered down to the last detail. Choose a time and step straight onto the pitch.</p>
+              <div className="mt-9 flex items-center gap-8 border-l border-primary pl-5 text-sm"><div><p className="font-semibold text-hero-foreground">03 private arenas</p><p className="mt-1 text-xs text-hero-muted">Inspected weekly</p></div><div><p className="font-semibold text-hero-foreground">4.8 player rating</p><p className="mt-1 text-xs text-hero-muted">Across Bengaluru</p></div></div>
             </div>
-            <div className="mt-14 grid max-w-2xl grid-cols-3 divide-x divide-surface-inverse-foreground/25 border-y border-surface-inverse-foreground/25 py-4 text-surface-inverse-foreground"><Stat value="03" label="Premium arenas"/><Stat value="56" label="Live slots"/><Stat value="4.8" label="Player rating"/></div>
+
+            <aside aria-label="Live booking console" className="reveal-up border border-hero-foreground/20 bg-hero/90 p-5 shadow-2xl backdrop-blur-md sm:p-7">
+              <div className="flex items-start justify-between gap-5 border-b border-hero-foreground/15 pb-5">
+                <div><p className="text-[10px] font-semibold uppercase text-primary">Live availability</p><h2 className="mt-2 font-display text-4xl leading-none">Reserve tonight.</h2></div>
+                <span className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase text-hero-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-primary"/> Updated now</span>
+              </div>
+              <div className="mt-5">
+                <label htmlFor="hero-venue" className="text-[10px] font-semibold uppercase text-hero-muted">Arena</label>
+                <select id="hero-venue" value={venueId} onChange={(event) => changeVenue(event.target.value)} className="mt-2 h-12 w-full border border-hero-foreground/20 bg-hero px-3 text-sm font-semibold text-hero-foreground outline-hidden focus:border-primary">{venues.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+              </div>
+              <div className="mt-5 flex items-end justify-between gap-4">
+                <div><p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p><p className="mt-1 font-display text-2xl">{activeDate ? formatDay(activeDate) : "No dates"}</p></div>
+                <div className="flex gap-1"><Button size="icon" variant="ghost" className="border border-hero-foreground/20 text-hero-foreground hover:bg-hero-foreground hover:text-hero" aria-label="Previous booking day" disabled={dayIndex === 0} onClick={() => { setDayIndex((value) => Math.max(0, value - 1)); setSlotId(""); }}><ChevronLeft/></Button><Button size="icon" variant="ghost" className="border border-hero-foreground/20 text-hero-foreground hover:bg-hero-foreground hover:text-hero" aria-label="Next booking day" disabled={dayIndex >= days.length - 1} onClick={() => { setDayIndex((value) => Math.min(days.length - 1, value + 1)); setSlotId(""); }}><ChevronRight/></Button></div>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2">{activeSlots.filter((slot) => slot.status !== "booked").slice(0, 3).map((slot) => <Button key={slot.id} variant={slot.id === slotId ? "sport" : "ghost"} className={`h-14 border text-xs ${slot.id === slotId ? "border-primary" : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"}`} onClick={() => { setSlotId(slot.id); setBooking(null); }}>{formatTime(slot.start_time)}</Button>)}</div>
+              <div className="mt-6 flex items-end justify-between gap-4 border-t border-hero-foreground/15 pt-5"><div><p className="text-[10px] font-semibold uppercase text-hero-muted">From</p><p className="font-display text-3xl">₹{venue.price_per_hour}<span className="font-sans text-xs text-hero-muted"> / hour</span></p></div><Button size="lg" variant="sport" onClick={jumpToBooking}>{slotId ? "Continue" : "View all slots"} <ArrowRight/></Button></div>
+            </aside>
+            <div className="flex items-center gap-4 border-t border-hero-foreground/15 pt-5 text-[10px] font-semibold uppercase text-hero-muted lg:col-span-2"><span>01</span><span className="h-px flex-1 bg-hero-foreground/15"/><span>Live booking · Instant confirmation</span></div>
           </div>
         </section>
 
