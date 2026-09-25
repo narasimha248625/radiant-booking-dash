@@ -1,26 +1,30 @@
-@import "tailwindcss" source(none);
+@import "tailwindcss";
 @source "../src";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system definition.
+ * ═══════════════════════════════════════════════════════════
+ *  ARENA STORIES — Design System
+ *  Brand: Box Cricket · Bengaluru
+ *  Primary: Cricket-field emerald green
+ *  Accent:  Warm amber / floodlight gold
+ * ═══════════════════════════════════════════════════════════
  *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
+ * The @theme inline block maps CSS custom properties to
+ * Tailwind utility classes:
+ *   --color-primary  →  bg-primary, text-primary, etc.
  *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- *
- * To add a new semantic color:
- * 1. Add the variable to :root (light value) and .dark (dark value)
- * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ * All color values use oklch format for perceptual uniformity.
  */
 
 @theme inline {
+  /* ── Typography ── */
   --font-display: "Instrument Serif", serif;
-  --font-sans: "Work Sans", sans-serif;
+  --font-sans: "Plus Jakarta Sans", sans-serif;
+
+  /* ── Border radius scale ── */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -28,6 +32,8 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* ── Semantic color tokens ── */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -63,40 +69,71 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ─────────────────────────────────────────────────────────
+   LIGHT MODE  — crisp cream/white base, emerald + amber brand
+   ───────────────────────────────────────────────────────── */
 :root {
   --radius: 0.25rem;
-  --background: oklch(0.965 0.008 107);
-  --foreground: oklch(0.17 0.012 120);
-  --card: oklch(0.99 0.004 105);
-  --card-foreground: oklch(0.17 0.012 120);
-  --popover: oklch(0.99 0.004 105);
-  --popover-foreground: oklch(0.17 0.012 120);
-  --primary: oklch(0.9 0.225 119);
-  --primary-foreground: oklch(0.17 0.012 120);
-  --secondary: oklch(0.89 0.012 110);
-  --secondary-foreground: oklch(0.23 0.018 120);
-  --muted: oklch(0.91 0.01 110);
-  --muted-foreground: oklch(0.46 0.018 120);
-  --accent: oklch(0.54 0.045 128);
-  --accent-foreground: oklch(0.99 0.004 105);
+
+  /* Surfaces */
+  --background: oklch(0.975 0.006 150);
+  --foreground: oklch(0.14 0.03 155);
+  --card: oklch(0.99 0.003 150);
+  --card-foreground: oklch(0.14 0.03 155);
+  --popover: oklch(0.99 0.003 150);
+  --popover-foreground: oklch(0.14 0.03 155);
+
+  /* Brand — Cricket-field emerald */
+  --primary: oklch(0.68 0.19 152);
+  --primary-foreground: oklch(0.99 0.003 150);
+
+  /* Secondary — soft sage */
+  --secondary: oklch(0.88 0.025 150);
+  --secondary-foreground: oklch(0.22 0.04 155);
+
+  /* Muted */
+  --muted: oklch(0.91 0.015 148);
+  --muted-foreground: oklch(0.48 0.025 152);
+
+  /* Accent — Amber / floodlight gold */
+  --accent: oklch(0.80 0.18 75);
+  --accent-foreground: oklch(0.14 0.03 60);
+
+  /* Destructive */
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.79 0.015 112);
-  --input: oklch(0.84 0.012 110);
-  --ring: oklch(0.9 0.225 119);
-  --surface-inverse: oklch(0.17 0.012 120);
-  --surface-inverse-foreground: oklch(0.965 0.008 107);
-  --hero: oklch(0.145 0.012 120);
-  --hero-foreground: oklch(0.965 0.008 107);
-  --hero-muted: oklch(0.74 0.018 112);
-  --status-success: oklch(0.58 0.17 145);
-  --status-danger: oklch(0.6 0.2 27);
-  --shadow-punch: 5px 5px 0 oklch(0.17 0.012 120);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+
+  /* UI chrome */
+  --border: oklch(0.78 0.022 150);
+  --input: oklch(0.84 0.018 150);
+  --ring: oklch(0.68 0.19 152);
+
+  /* Hero/dark-section surfaces */
+  --surface-inverse: oklch(0.13 0.038 155);
+  --surface-inverse-foreground: oklch(0.965 0.008 150);
+  --hero: oklch(0.115 0.035 155);
+  --hero-foreground: oklch(0.97 0.006 150);
+  --hero-muted: oklch(0.65 0.028 152);
+
+  /* Status */
+  --status-success: oklch(0.62 0.17 145);
+  --status-danger: oklch(0.60 0.20 27);
+
+  /* Signature punch shadow */
+  --shadow-punch: 5px 5px 0 oklch(0.14 0.03 155);
+
+  /* Gold highlight — used on logo and confirmation */
+  --gold: oklch(0.82 0.19 75);
+  --gold-foreground: oklch(0.14 0.03 60);
+
+  /* Charts */
+  --chart-1: oklch(0.68 0.19 152);
+  --chart-2: oklch(0.80 0.18 75);
+  --chart-3: oklch(0.55 0.15 152);
+  --chart-4: oklch(0.70 0.14 80);
+  --chart-5: oklch(0.45 0.12 152);
+
+  /* Sidebar */
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
   --sidebar-primary: oklch(0.208 0.042 265.755);
@@ -107,47 +144,95 @@
   --sidebar-ring: oklch(0.704 0.04 256.788);
 }
 
+/* ─────────────────────────────────────────────────────────
+   DARK MODE  — deep forest-green surfaces, vivid brand colours
+   ───────────────────────────────────────────────────────── */
 .dark {
-  --background: oklch(0.16 0.012 120);
-  --foreground: oklch(0.965 0.008 107);
-  --card: oklch(0.205 0.014 120);
-  --card-foreground: oklch(0.965 0.008 107);
-  --popover: oklch(0.205 0.014 120);
-  --popover-foreground: oklch(0.965 0.008 107);
-  --primary: oklch(0.9 0.225 119);
-  --primary-foreground: oklch(0.17 0.012 120);
-  --secondary: oklch(0.26 0.016 120);
-  --secondary-foreground: oklch(0.965 0.008 107);
-  --muted: oklch(0.25 0.014 120);
-  --muted-foreground: oklch(0.72 0.015 110);
-  --accent: oklch(0.56 0.055 128);
-  --accent-foreground: oklch(0.99 0.004 105);
+  /* Surfaces */
+  --background: oklch(0.15 0.028 155);
+  --foreground: oklch(0.965 0.008 150);
+  --card: oklch(0.19 0.032 155);
+  --card-foreground: oklch(0.965 0.008 150);
+  --popover: oklch(0.19 0.032 155);
+  --popover-foreground: oklch(0.965 0.008 150);
+
+  /* Brand */
+  --primary: oklch(0.72 0.19 152);
+  --primary-foreground: oklch(0.12 0.03 155);
+
+  /* Secondary */
+  --secondary: oklch(0.24 0.034 155);
+  --secondary-foreground: oklch(0.965 0.008 150);
+
+  /* Muted */
+  --muted: oklch(0.22 0.028 155);
+  --muted-foreground: oklch(0.68 0.022 150);
+
+  /* Accent */
+  --accent: oklch(0.82 0.19 75);
+  --accent-foreground: oklch(0.12 0.03 60);
+
+  /* Destructive */
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.38 0.018 120);
-  --input: oklch(0.31 0.016 120);
-  --ring: oklch(0.9 0.225 119);
-  --surface-inverse: oklch(0.965 0.008 107);
-  --surface-inverse-foreground: oklch(0.17 0.012 120);
-  --hero: oklch(0.145 0.012 120);
-  --hero-foreground: oklch(0.965 0.008 107);
-  --hero-muted: oklch(0.74 0.018 112);
-  --shadow-punch: 5px 5px 0 oklch(0.9 0.225 119 / 0.45);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+
+  /* UI chrome */
+  --border: oklch(0.32 0.03 155);
+  --input: oklch(0.27 0.028 155);
+  --ring: oklch(0.72 0.19 152);
+
+  /* Hero surfaces */
+  --surface-inverse: oklch(0.965 0.008 150);
+  --surface-inverse-foreground: oklch(0.15 0.028 155);
+  --hero: oklch(0.105 0.028 155);
+  --hero-foreground: oklch(0.965 0.008 150);
+  --hero-muted: oklch(0.62 0.025 150);
+
+  /* Status */
+  --status-success: oklch(0.65 0.18 145);
+  --status-danger: oklch(0.68 0.22 27);
+
+  /* Gold punch shadow (glowing amber in dark) */
+  --shadow-punch: 5px 5px 0 oklch(0.82 0.19 75 / 0.50);
+  --gold: oklch(0.84 0.20 75);
+  --gold-foreground: oklch(0.12 0.03 60);
+
+  /* Charts */
+  --chart-1: oklch(0.72 0.19 152);
+  --chart-2: oklch(0.82 0.19 75);
+  --chart-3: oklch(0.60 0.15 152);
+  --chart-4: oklch(0.72 0.15 80);
+  --chart-5: oklch(0.50 0.12 152);
+
+  /* Sidebar */
+  --sidebar: oklch(0.19 0.032 155);
+  --sidebar-foreground: oklch(0.965 0.008 150);
+  --sidebar-primary: oklch(0.72 0.19 152);
+  --sidebar-primary-foreground: oklch(0.12 0.03 155);
+  --sidebar-accent: oklch(0.24 0.034 155);
+  --sidebar-accent-foreground: oklch(0.965 0.008 150);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
+/* ─────────────────────────────────────────────────────────
+   Additional semantic colour registrations
+   ───────────────────────────────────────────────────────── */
+@theme inline {
+  --color-surface-inverse: var(--surface-inverse);
+  --color-surface-inverse-foreground: var(--surface-inverse-foreground);
+  --color-status-success: var(--status-success);
+  --color-status-danger: var(--status-danger);
+  --color-hero: var(--hero);
+  --color-hero-foreground: var(--hero-foreground);
+  --color-hero-muted: var(--hero-muted);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+}
+
+/* ─────────────────────────────────────────────────────────
+   BASE LAYER
+   ───────────────────────────────────────────────────────── */
 @layer base {
   * {
     border-color: var(--color-border);
@@ -162,32 +247,93 @@
   }
 }
 
-@theme inline {
-  --color-surface-inverse: var(--surface-inverse);
-  --color-surface-inverse-foreground: var(--surface-inverse-foreground);
-  --color-status-success: var(--status-success);
-  --color-status-danger: var(--status-danger);
-  --color-hero: var(--hero);
-  --color-hero-foreground: var(--hero-foreground);
-  --color-hero-muted: var(--hero-muted);
-}
-
 html { scroll-behavior: smooth; }
 
+/* ─────────────────────────────────────────────────────────
+   ANIMATIONS
+   ───────────────────────────────────────────────────────── */
+
+/* Entrance fade-up — used on hero section */
 @keyframes reveal-up {
   from { opacity: 0; transform: translateY(28px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
 @utility reveal-up { animation: reveal-up 0.7s ease-out both; }
 
-@utility hero-scrim {
-  background:
-    linear-gradient(90deg, color-mix(in oklab, var(--hero) 97%, transparent) 0%, color-mix(in oklab, var(--hero) 82%, transparent) 42%, color-mix(in oklab, var(--hero) 20%, transparent) 73%),
-    linear-gradient(0deg, color-mix(in oklab, var(--hero) 94%, transparent) 0%, transparent 58%);
+/* Brand shimmer — sweeps across the ARENA STORIES logo text */
+@keyframes brand-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@utility brand-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--gold) 0%,
+    oklch(0.95 0.22 85) 40%,
+    var(--gold) 60%,
+    oklch(0.70 0.18 70) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: brand-shimmer 3.5s linear infinite;
 }
 
+/* Soft pulse glow on the primary CTA button */
+@keyframes as-glow {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.72 0.19 152 / 0); }
+  50%       { box-shadow: 0 0 18px 6px oklch(0.72 0.19 152 / 0.35); }
+}
+@utility as-glow { animation: as-glow 2.4s ease-in-out infinite; }
+
+/* Pitch-grid background texture — diagonal turf lines */
+@utility pitch-grid {
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      oklch(0.68 0.19 152 / 0.06) 0px,
+      oklch(0.68 0.19 152 / 0.06) 1px,
+      transparent 1px,
+      transparent 32px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      oklch(0.68 0.19 152 / 0.06) 0px,
+      oklch(0.68 0.19 152 / 0.06) 1px,
+      transparent 1px,
+      transparent 32px
+    );
+}
+
+/* Hero scrim — keeps text readable over the hero photo */
+@utility hero-scrim {
+  background:
+    linear-gradient(90deg,
+      color-mix(in oklab, var(--hero) 97%, transparent) 0%,
+      color-mix(in oklab, var(--hero) 84%, transparent) 42%,
+      color-mix(in oklab, var(--hero) 22%, transparent) 73%),
+    linear-gradient(0deg,
+      color-mix(in oklab, var(--hero) 94%, transparent) 0%,
+      transparent 58%);
+}
+
+/* Celebration dots — appear on booking confirmed state */
+@keyframes confetti-pop {
+  0%   { opacity: 0; transform: scale(0) rotate(0deg); }
+  60%  { opacity: 1; transform: scale(1.3) rotate(180deg); }
+  100% { opacity: 1; transform: scale(1) rotate(360deg); }
+}
+@utility confetti-dot {
+  animation: confetti-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Reduce motion: respect user preferences */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }

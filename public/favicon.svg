@@ -1,0 +1,41 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  width="100%"
+  height="100%"
+>
+  <defs>
+    <linearGradient id="blGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <linearGradient id="blEmerald" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#047857" />
+      <stop offset="50%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#6ee7b7" />
+    </linearGradient>
+    <linearGradient id="blDarkEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#022c22" />
+      <stop offset="100%" stop-color="#064e3b" />
+    </linearGradient>
+    <filter id="blGlow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur" />
+      <feMerge>
+        <feMergeNode in="coloredBlur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Hexagon Base / Stadium shape -->
+  <polygon points="256,24 464,144 464,368 256,488 48,368 48,144" fill="url(#blDarkEmerald)" stroke="url(#blEmerald)" stroke-width="12" />
+
+  <!-- Abstract A overlapping shapes -->
+  <path d="M256 80 L120 380 L180 380 L256 190 L332 380 L392 380 Z" fill="url(#blGold)" filter="url(#blGlow)" />
+  
+  <path d="M180 280 L332 280" stroke="url(#blEmerald)" stroke-width="32" stroke-linecap="round" filter="url(#blGlow)"/>
+
+  <!-- Star at the apex -->
+  <polygon points="256,50 266,75 296,85 266,95 256,120 246,95 216,85 246,75" fill="#ffffff" filter="url(#blGlow)"/>
+</svg>
