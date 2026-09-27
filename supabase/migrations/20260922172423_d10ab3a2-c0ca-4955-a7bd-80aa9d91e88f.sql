@@ -37,6 +37,7 @@ GRANT ALL ON public.slots TO service_role;
 ALTER TABLE public.slots ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Slots are public" ON public.slots FOR SELECT TO anon, authenticated USING (true);
 
+DROP TABLE IF EXISTS public.bookings CASCADE;
 CREATE TABLE public.bookings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_code TEXT NOT NULL UNIQUE,
