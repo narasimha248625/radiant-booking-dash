@@ -112,9 +112,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.create_guest_booking(UUID, UUID, TEXT, INTEGER) TO anon, authenticated;
 
 INSERT INTO public.venues (name, location, description, price_per_hour, rating, amenities, image_key, featured) VALUES
-('Apex Floodlight Arena', 'Bengaluru • Indiranagar', 'Championship-grade 5v5 turf built for fast night football.', 1800, 4.9, ARRAY['FIFA turf','Floodlights','Changing room','Free parking'], 'hero', true),
-('Skyline Sports Yard', 'Bengaluru • Koramangala', 'An elevated urban court with skyline views and pro-grade lighting.', 2200, 4.8, ARRAY['7v7 court','Showers','Cafe','Equipment'], 'aerial', false),
-('Carbon Field House', 'Bengaluru • HSR Layout', 'A focused training ground for competitive squads and weekly leagues.', 1600, 4.7, ARRAY['5v5 court','Lockers','First aid','Drinking water'], 'action', false);
+('Arena Stories', 'Boddepalle, Narsipatnam Municipality • Anakapalli District', 'Premium box cricket turf in the heart of Narsipatnam. Located at Boddepalle, back side Hanuman Coffee Cafe, opposite Royal Park Resort, Andhra Pradesh 531116. Contact: +91 70935 93568 (Ruttala Ashok).', 1800, 4.9, ARRAY['Floodlights','Changing room','Free parking','Drinking water'], 'aerial', true);
 
 INSERT INTO public.slots (venue_id, slot_date, start_time, duration_minutes, court_label, capacity, reserved_count, status)
 SELECT v.id, current_date + d.day_offset, t.start_time, 60, c.court_label, 1,

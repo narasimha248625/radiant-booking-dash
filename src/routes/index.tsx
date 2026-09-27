@@ -449,18 +449,18 @@ function ArenaStories() {
               kicker="Pick your ground"
               title="BUILT FOR THE GAME."
             />
-            <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            <div className="mt-10 flex justify-center">
               {venues.map((item, index) => (
                 <article
                   key={item.id}
-                  className={`group overflow-hidden border transition-all duration-300 ${
+                  className={`group w-full max-w-3xl overflow-hidden border transition-all duration-300 ${
                     venueId === item.id
                       ? "border-primary shadow-[var(--shadow-punch)]"
                       : "border-border hover:border-foreground/40"
                   }`}
                 >
-                  {/* Venue image */}
-                  <div className="relative aspect-[4/3] overflow-hidden">
+                  {/* Venue image — wider aspect ratio for single card */}
+                  <div className="relative aspect-[16/9] overflow-hidden">
                     <img
                       src={imageMap[item.image_key as keyof typeof imageMap] ?? arenaImage}
                       alt={`${item.name} box cricket pitch`}
@@ -477,39 +477,56 @@ function ArenaStories() {
                         Most played
                       </span>
                     )}
+                    {/* Gradient overlay for a premium look */}
+                    <div className="absolute inset-0 bg-[linear-gradient(0deg,oklch(0.10_0.03_155/0.55),transparent_50%)]" />
+                    <p className="absolute bottom-6 left-6 font-display text-5xl text-white drop-shadow-lg">
+                      {item.name}
+                    </p>
                   </div>
 
                   {/* Venue details */}
-                  <div className="bg-card p-5">
+                  <div className="bg-card p-6">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="font-display text-3xl">{item.name}</h3>
-                        <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4" /> {item.location}
+                        {/* Full Address */}
+                        <p className="flex items-start gap-1.5 text-sm text-muted-foreground leading-relaxed">
+                          <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                          <span>Boddepalle, Narsipatnam Municipality, back side Hanuman Coffee Cafe / opposite Royal Park Resort, Anakapalli District, Andhra Pradesh 531116</span>
+                        </p>
+                        {/* Contact Info */}
+                        <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                          <span className="inline-flex items-center gap-1.5 rounded bg-primary/10 px-2 py-1 text-primary">
+                            📞 +91 70935 93568
+                          </span>
+                          <span className="text-muted-foreground font-normal">Ruttala Ashok</span>
                         </p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1 text-sm font-bold">
-                        <Star className="fill-gold text-gold" /> {item.rating}
-                      </div>
+
                     </div>
 
-                    <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                      {item.description}
-                    </p>
+                    {/* Amenities */}
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {item.amenities.map((amenity: string) => (
+                        <span key={amenity} className="rounded border border-border bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide">
+                          {amenity}
+                        </span>
+                      ))}
+                    </div>
 
-                    <div className="mt-5 flex items-end justify-between border-t border-border pt-4">
+                    <div className="mt-6 flex items-end justify-between border-t border-border pt-5">
                       <p>
-                        <span className="font-display text-3xl">₹{item.price_per_hour}</span>
+                        <span className="font-display text-4xl">₹{item.price_per_hour}</span>
                         <span className="text-xs text-muted-foreground"> / hour</span>
                       </p>
                       <Button
+                        size="lg"
                         variant={venueId === item.id ? "sport" : "sportOutline"}
                         onClick={() => {
                           changeVenue(item.id);
                           document.querySelector("#book")?.scrollIntoView({ behavior: "smooth" });
                         }}
                       >
-                        {venueId === item.id ? <><Check /> Selected</> : <>Choose <ArrowRight /></>}
+                        {venueId === item.id ? <><Check /> Selected</> : <>Book Now <ArrowRight /></>}
                       </Button>
                     </div>
                   </div>
