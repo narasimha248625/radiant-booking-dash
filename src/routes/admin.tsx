@@ -1,0 +1,373 @@
+import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState } from "react";
+import { getAdminData, addVenueAdmin, removeVenueAdmin, updateVenueAdmin } from "@/lib/admin.functions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import heroImage from "@/assets/turf-hero.jpg";
+
+export const Route = createFileRoute("/admin")({
+  component: AdminPanel,
+  loader: async () => {
+    return await getAdminData();
+  },
+});
+
+function AdminPanel() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  
+  const { venues, bookings } = Route.useLoaderData();
+  const router = useRouter();
+  const addVenueFn = useServerFn(addVenueAdmin);
+  const removeVenueFn = useServerFn(removeVenueAdmin);
+  const updateVenueFn = useServerFn(updateVenueAdmin);
+  
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [newVenue, setNewVenue] = useState({
+    name: "",
+    location: "",
+    description: "",
+    price_per_hour: 0,
+  });
+
+  useEffect(() => {
+    const auth = sessionStorage.getItem("adminAuth");
+    if (auth === "true") setIsAuthenticated(true);
+  }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email === "admin@admin.com" && password === "password") {
+      setIsAuthenticated(true);
+      sessionStorage.setItem("adminAuth", "true");
+      toast.success("Logged in successfully");
+    } else {
+      toast.error("Invalid credentials");
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    sessionStorage.removeItem("adminAuth");
+    toast.success("Logged out");
+  };
+
+  const handleAddOrUpdateVenue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      if (editingId) {
+        const result = await updateVenueFn({ data: { id: editingId, ...newVenue, price_per_hour: Number(newVenue.price_per_hour) } });
+        if (result.success) {
+          toast.success("Turf updated successfully");
+          setNewVenue({ name: "", location: "", description: "", price_per_hour: 0 });
+          setEditingId(null);
+          router.invalidate(); // Refresh data
+        } else {
+          toast.error(result.error || "Failed to update Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?");
+        }
+      } else {
+        const result = await addVenueFn({ data: { ...newVenue, price_per_hour: Number(newVenue.price_per_hour) } });
+        if (result.success) {
+          toast.success("Turf added successfully");
+          setNewVenue({ name: "", location: "", description: "", price_per_hour: 0 });
+          router.invalidate(); // Refresh data
+        } else {
+          toast.error(result.error || "Failed to add Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?");
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEditClick = (venue: any) => {
+    setEditingId(venue.id);
+    setNewVenue({
+      name: venue.name,
+      location: venue.location,
+      description: venue.description,
+      price_per_hour: venue.price_per_hour,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setNewVenue({ name: "", location: "", description: "", price_per_hour: 0 });
+  };
+
+  const handleRemoveVenue = async (id: string) => {
+    if (!window.confirm("Are you sure you want to remove this turf? This might affect existing bookings.")) return;
+    
+    try {
+      const result = await removeVenueFn({ data: { id } });
+      if (result.success) {
+        toast.success("Turf removed successfully");
+        if (editingId === id) handleCancelEdit();
+        router.invalidate();
+      } else {
+        toast.error(result.error || "Failed to remove Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred");
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-hero flex items-center justify-center p-4">
+        <img
+          src={heroImage}
+          alt="Hero Background"
+          className="absolute inset-0 h-full w-full object-cover object-[64%_center]"
+        />
+        <div className="hero-scrim absolute inset-0" />
+        <div className="relative z-10 w-full max-w-md">
+          <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 text-white shadow-2xl">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold">Admin Login</CardTitle>
+              <CardDescription className="text-zinc-400">Enter your credentials to access the admin panel.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="bg-zinc-800/80 border-zinc-700 text-white"
+                    placeholder="admin@admin.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="bg-zinc-800/80 border-zinc-700 text-white"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold">
+                  Login
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-hero text-white p-6">
+      <img
+        src={heroImage}
+        alt="Hero Background"
+        className="absolute inset-0 h-full w-full object-cover object-[64%_center]"
+      />
+      <div className="hero-scrim absolute inset-0" />
+      <div className="relative z-10 max-w-6xl mx-auto space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-md">Admin Dashboard</h1>
+            <p className="text-zinc-300 mt-1 drop-shadow-md">Manage turfs, bookings, and users.</p>
+          </div>
+          <Button variant="outline" onClick={handleLogout} className="border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800">
+            Logout
+          </Button>
+        </div>
+
+        <Tabs defaultValue="bookings" className="w-full">
+          <TabsList className="bg-zinc-900 border border-zinc-800 mb-6">
+            <TabsTrigger value="bookings" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white">Bookings & Users</TabsTrigger>
+            <TabsTrigger value="turfs" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white">Turfs (Pitches)</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="bookings" className="space-y-4 mt-0">
+            <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl">
+              <CardHeader>
+                <CardTitle className="text-white">Recent Bookings</CardTitle>
+                <CardDescription className="text-zinc-400">List of users who booked slots on the platform.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {bookings.length > 0 ? (
+                  <div className="rounded-md border border-zinc-800 overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-zinc-950">
+                        <TableRow className="border-zinc-800 hover:bg-zinc-950/50">
+                          <TableHead className="text-zinc-400">Code</TableHead>
+                          <TableHead className="text-zinc-400">User / Player</TableHead>
+                          <TableHead className="text-zinc-400">Venue</TableHead>
+                          <TableHead className="text-zinc-400">Date & Time</TableHead>
+                          <TableHead className="text-zinc-400">Team Size</TableHead>
+                          <TableHead className="text-right text-zinc-400">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {bookings.map((booking: any) => (
+                          <TableRow key={booking.id} className="border-zinc-800 hover:bg-zinc-800/50">
+                            <TableCell className="font-medium text-white">{booking.booking_code}</TableCell>
+                            <TableCell className="text-zinc-300">{booking.player_name}</TableCell>
+                            <TableCell className="text-zinc-300">{booking.venues?.name || "Unknown"}</TableCell>
+                            <TableCell className="text-zinc-300">
+                              {booking.slots?.slot_date} {booking.slots?.start_time}
+                            </TableCell>
+                            <TableCell className="text-zinc-300">{booking.team_size}</TableCell>
+                            <TableCell className="text-right text-[#00D084]">₹{booking.amount}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-zinc-500">No bookings found.</div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="turfs" className="space-y-6 mt-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-1">
+                <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl">
+                  <CardHeader>
+                    <CardTitle className="text-white">{editingId ? "Update Turf" : "Add New Turf"}</CardTitle>
+                    <CardDescription className="text-zinc-400">
+                      {editingId ? "Update the details of the selected pitch." : "Create a new pitch for users to select."}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleAddOrUpdateVenue} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="text-zinc-300">Name</Label>
+                        <Input
+                          id="name"
+                          value={newVenue.name}
+                          onChange={(e) => setNewVenue({ ...newVenue, name: e.target.value })}
+                          className="bg-zinc-800 border-zinc-700 text-white"
+                          placeholder="e.g. Central Park Turf"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location" className="text-zinc-300">Location</Label>
+                        <Input
+                          id="location"
+                          value={newVenue.location}
+                          onChange={(e) => setNewVenue({ ...newVenue, location: e.target.value })}
+                          className="bg-zinc-800 border-zinc-700 text-white"
+                          placeholder="e.g. Bengaluru • Jayanagar"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="price" className="text-zinc-300">Price per Hour (₹)</Label>
+                        <Input
+                          id="price"
+                          type="number"
+                          min="0"
+                          value={newVenue.price_per_hour}
+                          onChange={(e) => setNewVenue({ ...newVenue, price_per_hour: e.target.value as any })}
+                          className="bg-zinc-800 border-zinc-700 text-white"
+                          placeholder="1500"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="desc" className="text-zinc-300">Description</Label>
+                        <Input
+                          id="desc"
+                          value={newVenue.description}
+                          onChange={(e) => setNewVenue({ ...newVenue, description: e.target.value })}
+                          className="bg-zinc-800 border-zinc-700 text-white"
+                          placeholder="A great place to play..."
+                          required
+                        />
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        <Button type="submit" disabled={isLoading} className="flex-1 bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold">
+                          {isLoading ? "Saving..." : (editingId ? "Update Turf" : "Add Turf")}
+                        </Button>
+                        {editingId && (
+                          <Button type="button" variant="outline" disabled={isLoading} onClick={handleCancelEdit} className="border-zinc-700 text-white hover:bg-zinc-800">
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <div className="md:col-span-2">
+                <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl h-full">
+                  <CardHeader>
+                    <CardTitle className="text-white">Existing Turfs</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border border-zinc-800 overflow-hidden">
+                      <Table>
+                        <TableHeader className="bg-zinc-950">
+                          <TableRow className="border-zinc-800 hover:bg-zinc-950/50">
+                            <TableHead className="text-zinc-400">Name</TableHead>
+                            <TableHead className="text-zinc-400">Location</TableHead>
+                            <TableHead className="text-right text-zinc-400">Price / hr</TableHead>
+                            <TableHead className="text-right text-zinc-400">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {venues.map((venue: any) => (
+                            <TableRow key={venue.id} className="border-zinc-800 hover:bg-zinc-800/50">
+                              <TableCell className="font-medium text-white">{venue.name}</TableCell>
+                              <TableCell className="text-zinc-300">{venue.location}</TableCell>
+                              <TableCell className="text-right text-[#00D084]">₹{venue.price_per_hour}</TableCell>
+                              <TableCell className="text-right space-x-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleEditClick(venue)}
+                                  className="border-zinc-700 text-white hover:bg-zinc-800"
+                                >
+                                  Edit
+                                </Button>
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm" 
+                                  onClick={() => handleRemoveVenue(venue.id)}
+                                  className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white"
+                                >
+                                  Remove
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
