@@ -3,47 +3,19 @@ import { z } from "zod";
 
 const DEFAULT_VENUES = [
   {
-    id: "0100dadc-1e8b-47a1-a806-c46201f8e58c",
-    name: "Apex Floodlight Arena",
+    id: "11111111-1111-1111-1111-111111111111",
+    name: "Arena Stories — Main Pitch",
     location: "Bengaluru • Indiranagar",
-    description: "Championship-grade 5v5 turf built for fast night box cricket and football.",
+    description: "Premium artificial turf for 5v5 and 7v7 matches with floodlights and seating.",
     price_per_hour: 1800,
-    rating: 4.9,
-    amenities: ["FIFA turf", "Floodlights", "Changing room", "Free parking"],
+    rating: 4.8,
+    amenities: ["Floodlights", "Changing room", "Free parking", "Water fountain"],
     image_key: "hero",
     featured: true,
     active: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-  },
-  {
-    id: "0200dadc-1e8b-47a1-a806-c46201f8e58d",
-    name: "Skyline Sports Yard",
-    location: "Bengaluru • Koramangala",
-    description: "An elevated urban court with skyline views, pro-grade lighting, and spectator lounge.",
-    price_per_hour: 2200,
-    rating: 4.8,
-    amenities: ["7v7 court", "Showers", "Cafe", "Equipment"],
-    image_key: "aerial",
-    featured: false,
-    active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "0300dadc-1e8b-47a1-a806-c46201f8e58e",
-    name: "Carbon Field House",
-    location: "Bengaluru • HSR Layout",
-    description: "A focused training ground for competitive squads and weekly leagues.",
-    price_per_hour: 1600,
-    rating: 4.7,
-    amenities: ["5v5 court", "Lockers", "First aid", "Drinking water"],
-    image_key: "action",
-    featured: false,
-    active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
+  }
 ];
 
 function generateFallbackSlots(venues: Array<{ id: string }>) {
@@ -72,14 +44,16 @@ function generateFallbackSlots(venues: Array<{ id: string }>) {
     for (const venue of venues) {
       for (let t = 0; t < times.length; t++) {
         for (let c = 0; c < courts.length; c++) {
+          const time = times[t] as string;
+          const court = courts[c] as string;
           const isBooked = (d + t + c) % 5 === 0;
           generatedSlots.push({
-            id: `slot-${venue.id.slice(0, 8)}-${dateStr}-${times[t].slice(0, 2)}${courts[c]}`,
+            id: `slot-${venue.id.slice(0, 8)}-${dateStr}-${time.slice(0, 2)}${court}`,
             venue_id: venue.id,
             slot_date: dateStr,
-            start_time: times[t],
+            start_time: time,
             duration_minutes: 60,
-            court_label: courts[c],
+            court_label: court,
             capacity: 1,
             reserved_count: isBooked ? 1 : 0,
             status: isBooked ? "booked" : "available",
