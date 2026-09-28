@@ -3,7 +3,7 @@ import { z } from "zod";
 
 
 
-export const getTurfData = createServerFn({ method: "GET" }).handler(async () => {
+export const getTurfData = createServerFn({ method: "POST" }).handler(async () => {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const today = new Date().toISOString().slice(0, 10);
