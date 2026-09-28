@@ -28,6 +28,7 @@ import {
   Menu,
   Minus,
   Moon,
+  Phone,
   Plus,
   ShieldCheck,
   Sparkles,
@@ -469,6 +470,9 @@ function ArenaStories() {
                       loading="lazy"
                       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
+                    {/* Gradient overlay for text */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    
                     <span className="absolute left-4 top-4 bg-surface-inverse px-3 py-1 text-xs font-bold uppercase text-surface-inverse-foreground">
                       0{index + 1}
                     </span>
@@ -477,25 +481,32 @@ function ArenaStories() {
                         Most played
                       </span>
                     )}
+                    
+                    <h3 className="absolute bottom-4 left-4 font-display text-3xl text-white drop-shadow-md">
+                      {item.name}
+                    </h3>
                   </div>
 
                   {/* Venue details */}
                   <div className="bg-card p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="font-display text-3xl">{item.name}</h3>
-                        <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-                          <MapPin className="h-4 w-4" /> {item.location}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1 text-sm font-bold">
-                        <Star className="fill-gold text-gold" /> {item.rating}
-                      </div>
+                    <div className="space-y-3">
+                      <p className="flex items-start gap-2 text-sm text-muted-foreground leading-relaxed">
+                        <MapPin className="h-4 w-4 shrink-0 text-primary mt-1" />
+                        <span>{item.location}</span>
+                      </p>
+                      <p className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
+                        <Phone className="h-4 w-4 shrink-0 text-primary" />
+                        <span className="text-primary">+91 70935 93568</span> <span className="font-normal">Muttala Ashok</span>
+                      </p>
                     </div>
 
-                    <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                      {item.description}
-                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {item.amenities.map((amenity) => (
+                        <span key={amenity} className="rounded-sm bg-muted/60 px-2 py-1 text-xs font-bold uppercase text-muted-foreground border border-border/50">
+                          {amenity}
+                        </span>
+                      ))}
+                    </div>
 
                     <div className="mt-5 flex items-end justify-between border-t border-border pt-4">
                       <p>
