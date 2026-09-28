@@ -18,15 +18,23 @@ export const getAdminData = createServerFn({ method: "GET" }).handler(async () =
       .select("*, venues(name), slots(slot_date, start_time)")
       .order("created_at", { ascending: false });
 
+    const { data: slots, error: slotsError } = await supabaseAdmin
+      .from("slots")
+      .select("*, venues(name)")
+      .order("slot_date", { ascending: false })
+      .order("start_time", { ascending: true });
+
     return {
       venues: venues || [],
       bookings: bookings || [],
+      slots: slots || [],
     };
   } catch (err) {
     console.error("[getAdminData] Failed to fetch admin data:", err);
     return {
       venues: [],
       bookings: [],
+      slots: [],
     };
   }
 });
@@ -109,6 +117,60 @@ export const updateVenueAdmin = createServerFn({ method: "POST" })
       return { success: true };
     } catch (err: any) {
       console.error("[updateVenueAdmin] Failed to update venue:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
+const addSlotSchema = z.object({
+  venue_id: z.string().uuid(),
+  slot_date: z.string(),
+  start_time: z.string(),
+  duration_minutes: z.number().int(),
+  court_label: z.string().min(1),
+  capacity: z.number().int().min(1),
+});
+
+export const addSlotAdmin = createServerFn({ method: "POST" })
+  .validator((input) => addSlotSchema.parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: slot, error } = await supabaseAdmin
+        .from("slots")
+        .insert([{
+          ...data,
+          status: "available",
+          reserved_count: 0
+        }])
+        .select()
+        .single();
+      
+      if (error) throw new Error(error.message);
+      return { success: true, slot };
+    } catch (err: any) {
+      console.error("[addSlotAdmin] Failed to add slot:", err);
+      return { success: false, error: err.message };
+    }
+  });
+
+const removeSlotSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const removeSlotAdmin = createServerFn({ method: "POST" })
+  .validator((input) => removeSlotSchema.parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin
+        .from("slots")
+        .delete()
+        .eq("id", data.id);
+      
+      if (error) throw new Error(error.message);
+      return { success: true };
+    } catch (err: any) {
+      console.error("[removeSlotAdmin] Failed to remove slot:", err);
       return { success: false, error: err.message };
     }
   });
