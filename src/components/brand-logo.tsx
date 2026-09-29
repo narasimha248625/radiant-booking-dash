@@ -40,15 +40,34 @@ export function BrandLogo({ size = 36, glow = true, className = "", ...props }: 
       </defs>
 
       {/* Hexagon Base / Stadium shape */}
-      <polygon points="256,24 464,144 464,368 256,488 48,368 48,144" fill="url(#blDarkEmerald)" stroke="url(#blEmerald)" strokeWidth="12" />
+      <polygon
+        points="256,24 464,144 464,368 256,488 48,368 48,144"
+        fill="url(#blDarkEmerald)"
+        stroke="url(#blEmerald)"
+        strokeWidth="12"
+      />
 
       {/* Abstract A overlapping shapes */}
-      <path d="M256 80 L120 380 L180 380 L256 190 L332 380 L392 380 Z" fill="url(#blGold)" filter="url(#blGlow)" />
-      
-      <path d="M180 280 L332 280" stroke="url(#blEmerald)" strokeWidth="32" strokeLinecap="round" filter="url(#blGlow)"/>
+      <path
+        d="M256 80 L120 380 L180 380 L256 190 L332 380 L392 380 Z"
+        fill="url(#blGold)"
+        filter="url(#blGlow)"
+      />
+
+      <path
+        d="M180 280 L332 280"
+        stroke="url(#blEmerald)"
+        strokeWidth="32"
+        strokeLinecap="round"
+        filter="url(#blGlow)"
+      />
 
       {/* Star at the apex */}
-      <polygon points="256,50 266,75 296,85 266,95 256,120 246,95 216,85 246,75" fill="#ffffff" filter="url(#blGlow)"/>
+      <polygon
+        points="256,50 266,75 296,85 266,95 256,120 246,95 216,85 246,75"
+        fill="#ffffff"
+        filter="url(#blGlow)"
+      />
     </svg>
   );
 }

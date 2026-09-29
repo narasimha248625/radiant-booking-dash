@@ -91,11 +91,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       /* ── Arena Stories primary meta ── */
       { title: "Arena Stories — Premium Box Cricket Booking" },
-      { name: "description", content: "Book premium box cricket pitches in Bengaluru. Live slot availability, instant confirmation, and an unforgettable game every time." },
+      {
+        name: "description",
+        content:
+          "Book premium box cricket pitches in Bengaluru. Live slot availability, instant confirmation, and an unforgettable game every time.",
+      },
       { name: "author", content: "Arena Stories" },
       /* ── Open Graph ── */
       { property: "og:title", content: "Arena Stories — Premium Box Cricket Booking" },
-      { property: "og:description", content: "Live slots. Floodlit pitches. Instant booking confirmation. Every match, a new story." },
+      {
+        property: "og:description",
+        content:
+          "Live slots. Floodlit pitches. Instant booking confirmation. Every match, a new story.",
+      },
       { property: "og:type", content: "website" },
       /* ── Twitter Card ── */
       { name: "twitter:card", content: "summary_large_image" },

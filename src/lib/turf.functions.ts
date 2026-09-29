@@ -1,8 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-
-
 export const getTurfData = createServerFn({ method: "POST" }).handler(async () => {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -10,8 +8,17 @@ export const getTurfData = createServerFn({ method: "POST" }).handler(async () =
 
     const [{ data: venues, error: venueError }, { data: slots, error: slotError }] =
       await Promise.all([
-        supabaseAdmin.from("venues").select("*").eq("active", true).order("featured", { ascending: false }),
-        supabaseAdmin.from("slots").select("*").gte("slot_date", today).order("slot_date").order("start_time"),
+        supabaseAdmin
+          .from("venues")
+          .select("*")
+          .eq("active", true)
+          .order("featured", { ascending: false }),
+        supabaseAdmin
+          .from("slots")
+          .select("*")
+          .gte("slot_date", today)
+          .order("slot_date")
+          .order("start_time"),
       ]);
 
     if (venueError) {
@@ -21,12 +28,16 @@ export const getTurfData = createServerFn({ method: "POST" }).handler(async () =
       console.warn("[getTurfData] Slot fetch warning:", slotError.message);
     }
 
-    let finalVenues = venues ?? [];
+    const finalVenues = venues ?? [];
     let finalSlots = slots ?? [];
 
     // Fallback: If no future slots exist in DB, fetch all slots regardless of date
     if (finalSlots.length === 0) {
-      const { data: allSlots } = await supabaseAdmin.from("slots").select("*").order("slot_date").order("start_time");
+      const { data: allSlots } = await supabaseAdmin
+        .from("slots")
+        .select("*")
+        .order("slot_date")
+        .order("start_time");
       if (allSlots && allSlots.length > 0) {
         finalSlots = allSlots;
       }
@@ -61,7 +72,7 @@ export const createBooking = createServerFn({ method: "POST" })
       if (!error && result?.[0]) {
         return result[0];
       }
-      
+
       throw new Error(error?.message || "Booking failed");
     } catch (err) {
       console.error("[createBooking] DB booking exception:", err);

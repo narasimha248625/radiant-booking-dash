@@ -51,13 +51,20 @@ import actionImage from "@/assets/match-action.jpg";
 /* ─────────────────────────────────────────────────────────
    Route definition — data loader fetches venues + slots
    ───────────────────────────────────────────────────────── */
-export const Route = createFileRoute("/")(({
+export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Arena Stories — Book Premium Box Cricket Pitches" },
-      { name: "description", content: "Find live box cricket slot availability, choose your arena, and confirm your match in seconds. Every match, a new story." },
+      {
+        name: "description",
+        content:
+          "Find live box cricket slot availability, choose your arena, and confirm your match in seconds. Every match, a new story.",
+      },
       { property: "og:title", content: "Arena Stories — Book Premium Box Cricket Pitches" },
-      { property: "og:description", content: "Live slots. Premium pitches. Instant booking confirmation." },
+      {
+        property: "og:description",
+        content: "Live slots. Premium pitches. Instant booking confirmation.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -80,7 +87,7 @@ export const Route = createFileRoute("/")(({
       <h1 className="font-display text-6xl">ARENA NOT FOUND</h1>
     </main>
   ),
-}));
+});
 
 /* Map image_key values (from DB) to imported assets */
 const imageMap = {
@@ -88,8 +95,6 @@ const imageMap = {
   aerial: arenaImage,
   action: actionImage,
 } as const;
-
-
 
 /* ─────────────────────────────────────────────────────────
    Main component
@@ -176,11 +181,7 @@ function ArenaStories() {
       /* Revalidate server data so slot status updates immediately */
       await router.invalidate({ sync: true });
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Booking failed. Please try another slot.",
-      );
+      setError(err instanceof Error ? err.message : "Booking failed. Please try another slot.");
     } finally {
       setSubmitting(false);
     }
@@ -191,7 +192,6 @@ function ArenaStories() {
   return (
     <div className={isDark ? "dark" : ""}>
       <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
-
         {/* ══════════════════════════════════════════
             NAVIGATION BAR
             Fixed header with Arena Stories logo
@@ -199,8 +199,14 @@ function ArenaStories() {
         <header className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
           <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 lg:h-20 lg:px-8">
             {/* Brand logo — Crest icon + "ARENA" in shimmer gold + "//STORIES" */}
-            <a href="#top" className="group flex min-w-0 select-none items-center gap-3 font-sans text-xl font-extrabold tracking-tight text-foreground">
-              <BrandLogo size={36} className="transition-transform duration-300 group-hover:scale-105" />
+            <a
+              href="#top"
+              className="group flex min-w-0 select-none items-center gap-3 font-sans text-xl font-extrabold tracking-tight text-foreground"
+            >
+              <BrandLogo
+                size={36}
+                className="transition-transform duration-300 group-hover:scale-105"
+              />
               <span>
                 <span className="brand-shimmer">ARENA</span>
                 <span className="text-foreground/80">//STORIES</span>
@@ -210,9 +216,15 @@ function ArenaStories() {
             <div className="flex shrink-0 items-center gap-2">
               {/* Desktop nav links */}
               <nav className="hidden items-center gap-8 text-xs font-bold uppercase lg:flex">
-                <a className="transition-colors hover:text-primary" href="#pitches">Pitches</a>
-                <a className="transition-colors hover:text-primary" href="#book">Book Now</a>
-                <a className="transition-colors hover:text-primary" href="#status">My Match</a>
+                <a className="transition-colors hover:text-primary" href="#pitches">
+                  Pitches
+                </a>
+                <a className="transition-colors hover:text-primary" href="#book">
+                  Book Now
+                </a>
+                <a className="transition-colors hover:text-primary" href="#status">
+                  My Match
+                </a>
               </nav>
 
               {/* Dark / light toggle */}
@@ -256,11 +268,31 @@ function ArenaStories() {
           {/* Mobile menu drawer */}
           {menuOpen && (
             <nav className="grid border-t border-border bg-background p-5 text-xl font-bold uppercase lg:hidden">
-              <a className="border-b border-border py-3" href="#pitches" onClick={() => setMenuOpen(false)}>Pitches</a>
-              <a className="border-b border-border py-3" href="#book" onClick={() => setMenuOpen(false)}>Book Now</a>
-              <a className="border-b border-border py-3" href="#status" onClick={() => setMenuOpen(false)}>My Match</a>
+              <a
+                className="border-b border-border py-3"
+                href="#pitches"
+                onClick={() => setMenuOpen(false)}
+              >
+                Pitches
+              </a>
+              <a
+                className="border-b border-border py-3"
+                href="#book"
+                onClick={() => setMenuOpen(false)}
+              >
+                Book Now
+              </a>
+              <a
+                className="border-b border-border py-3"
+                href="#status"
+                onClick={() => setMenuOpen(false)}
+              >
+                My Match
+              </a>
               <div className="flex items-center justify-between py-4">
-                <span className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">Appearance</span>
+                <span className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                  Appearance
+                </span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -302,7 +334,6 @@ function ArenaStories() {
           <div className="hero-scrim absolute inset-0" />
 
           <div className="relative mx-auto grid min-h-[calc(860px-4rem)] w-full max-w-7xl content-end gap-12 px-5 pb-8 pt-28 lg:min-h-[calc(min(940px,100svh)-5rem)] lg:grid-cols-[minmax(0,1.05fr)_minmax(390px,0.72fr)] lg:items-end lg:gap-16 lg:px-8 lg:pb-10">
-
             {/* ── Hero copy ── */}
             <div className="reveal-up min-w-0">
               {/* Kicker line */}
@@ -313,12 +344,14 @@ function ArenaStories() {
 
               {/* Main headline */}
               <h1 className="max-w-3xl font-display text-6xl leading-[0.88] sm:text-7xl lg:text-[6.7rem]">
-                Where cricket<br />
+                Where cricket
+                <br />
                 <em className="font-normal text-primary">writes its stories.</em>
               </h1>
 
               <p className="mt-7 max-w-lg text-sm leading-7 text-hero-muted sm:text-base">
-                Floodlit pitches built for the city's best players. Pick your slot, gather your squad, and let the match do the talking.
+                Floodlit pitches built for the city's best players. Pick your slot, gather your
+                squad, and let the match do the talking.
               </p>
 
               {/* Stats bar */}
@@ -342,7 +375,9 @@ function ArenaStories() {
               {/* Console header */}
               <div className="flex items-start justify-between gap-5 border-b border-hero-foreground/15 pb-5">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase text-primary">Live availability</p>
+                  <p className="text-[10px] font-semibold uppercase text-primary">
+                    Live availability
+                  </p>
                   <h2 className="mt-2 font-display text-4xl leading-none">Book your match.</h2>
                 </div>
                 <span className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase text-hero-muted">
@@ -353,7 +388,10 @@ function ArenaStories() {
 
               {/* Pitch selector */}
               <div className="mt-5">
-                <label htmlFor="hero-venue" className="text-[10px] font-semibold uppercase text-hero-muted">
+                <label
+                  htmlFor="hero-venue"
+                  className="text-[10px] font-semibold uppercase text-hero-muted"
+                >
                   Pitch
                 </label>
                 <select
@@ -363,7 +401,9 @@ function ArenaStories() {
                   className="mt-2 h-12 w-full border border-hero-foreground/20 bg-hero px-3 text-sm font-semibold text-hero-foreground outline-hidden focus:border-primary"
                 >
                   {venues.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}</option>
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -378,19 +418,31 @@ function ArenaStories() {
                 </div>
                 <div className="flex gap-1">
                   <Button
-                    size="icon" variant="ghost"
+                    size="icon"
+                    variant="ghost"
                     className="border border-hero-foreground/20 text-hero-foreground hover:bg-hero-foreground hover:text-hero"
                     aria-label="Previous match day"
                     disabled={dayIndex === 0}
-                    onClick={() => { setDayIndex((v) => Math.max(0, v - 1)); setSlotId(""); }}
-                  ><ChevronLeft /></Button>
+                    onClick={() => {
+                      setDayIndex((v) => Math.max(0, v - 1));
+                      setSlotId("");
+                    }}
+                  >
+                    <ChevronLeft />
+                  </Button>
                   <Button
-                    size="icon" variant="ghost"
+                    size="icon"
+                    variant="ghost"
                     className="border border-hero-foreground/20 text-hero-foreground hover:bg-hero-foreground hover:text-hero"
                     aria-label="Next match day"
                     disabled={dayIndex >= days.length - 1}
-                    onClick={() => { setDayIndex((v) => Math.min(days.length - 1, v + 1)); setSlotId(""); }}
-                  ><ChevronRight /></Button>
+                    onClick={() => {
+                      setDayIndex((v) => Math.min(days.length - 1, v + 1));
+                      setSlotId("");
+                    }}
+                  >
+                    <ChevronRight />
+                  </Button>
                 </div>
               </div>
 
@@ -408,7 +460,10 @@ function ArenaStories() {
                           ? "border-primary"
                           : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
                       }`}
-                      onClick={() => { setSlotId(slot.id); setBooking(null); }}
+                      onClick={() => {
+                        setSlotId(slot.id);
+                        setBooking(null);
+                      }}
                     >
                       {formatTime(slot.start_time)}
                     </Button>
@@ -445,11 +500,7 @@ function ArenaStories() {
             ══════════════════════════════════════════ */}
         <section id="pitches" className="px-5 py-20 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-7xl">
-            <SectionTitle
-              number="01"
-              kicker="Pick your ground"
-              title="BUILT FOR THE GAME."
-            />
+            <SectionTitle number="01" kicker="Pick your ground" title="BUILT FOR THE GAME." />
             <div className="mt-10 grid gap-5 lg:grid-cols-3">
               {venues.map((item, index) => (
                 <article
@@ -472,7 +523,7 @@ function ArenaStories() {
                     />
                     {/* Gradient overlay for text */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                    
+
                     <span className="absolute left-4 top-4 bg-surface-inverse px-3 py-1 text-xs font-bold uppercase text-surface-inverse-foreground">
                       0{index + 1}
                     </span>
@@ -481,7 +532,7 @@ function ArenaStories() {
                         Most played
                       </span>
                     )}
-                    
+
                     <h3 className="absolute bottom-4 left-4 font-display text-3xl text-white drop-shadow-md">
                       {item.name}
                     </h3>
@@ -496,13 +547,17 @@ function ArenaStories() {
                       </p>
                       <p className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
                         <Phone className="h-4 w-4 shrink-0 text-primary" />
-                        <span className="text-primary">+91 70935 93568</span> <span className="font-normal">Muttala Ashok</span>
+                        <span className="text-primary">+91 70935 93568</span>{" "}
+                        <span className="font-normal">Muttala Ashok</span>
                       </p>
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
                       {item.amenities.map((amenity) => (
-                        <span key={amenity} className="rounded-sm bg-muted/60 px-2 py-1 text-xs font-bold uppercase text-muted-foreground border border-border/50">
+                        <span
+                          key={amenity}
+                          className="rounded-sm bg-muted/60 px-2 py-1 text-xs font-bold uppercase text-muted-foreground border border-border/50"
+                        >
                           {amenity}
                         </span>
                       ))}
@@ -520,7 +575,15 @@ function ArenaStories() {
                           document.querySelector("#book")?.scrollIntoView({ behavior: "smooth" });
                         }}
                       >
-                        {venueId === item.id ? <><Check /> Selected</> : <>Choose <ArrowRight /></>}
+                        {venueId === item.id ? (
+                          <>
+                            <Check /> Selected
+                          </>
+                        ) : (
+                          <>
+                            Choose <ArrowRight />
+                          </>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -556,16 +619,18 @@ function ArenaStories() {
             <div>
               <p className="text-xs font-bold uppercase text-primary">Match-ready as standard</p>
               <h2 className="mt-4 max-w-xl font-display text-6xl leading-[0.9] sm:text-8xl">
-                EVERY DETAIL.<br />GAME DAY READY.
+                EVERY DETAIL.
+                <br />
+                GAME DAY READY.
               </h2>
               <div className="mt-10 grid gap-px bg-surface-inverse-foreground/20 sm:grid-cols-2">
                 {(
                   [
                     { icon: Sparkles, label: "Pro-grade pitch" },
-                    { icon: Zap,      label: "Floodlit nights" },
-                    { icon: Clock3,   label: "Open till midnight" },
-                    { icon: Trophy,   label: "10-a-side matches" },
-                    { icon: Users,    label: "Squad bookings" },
+                    { icon: Zap, label: "Floodlit nights" },
+                    { icon: Clock3, label: "Open till midnight" },
+                    { icon: Trophy, label: "10-a-side matches" },
+                    { icon: Users, label: "Squad bookings" },
                     { icon: ShieldCheck, label: "Safety checked" },
                   ] satisfies { icon: LucideIcon; label: string }[]
                 ).map(({ icon: Icon, label }) => (
@@ -585,22 +650,21 @@ function ArenaStories() {
             ══════════════════════════════════════════ */}
         <section id="book" className="pitch-grid px-5 py-20 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-7xl">
-            <SectionTitle
-              number="02"
-              kicker="Live booking"
-              title="LOCK IN YOUR MATCH."
-            />
+            <SectionTitle number="02" kicker="Live booking" title="LOCK IN YOUR MATCH." />
 
             <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.7fr)]">
-
               {/* ── Left: booking form ── */}
               <div className="min-w-0">
                 {/* Step progress bar */}
                 <div className="mb-7 grid grid-cols-4 gap-1">
                   {["Pitch", "Slot", "Details", "Confirmed"].map((label, index) => (
                     <div key={label}>
-                      <div className={`h-1 transition-colors duration-300 ${index + 1 <= step ? "bg-primary" : "bg-muted"}`} />
-                      <p className={`mt-2 text-xs font-bold uppercase ${index + 1 <= step ? "text-foreground" : "text-muted-foreground"}`}>
+                      <div
+                        className={`h-1 transition-colors duration-300 ${index + 1 <= step ? "bg-primary" : "bg-muted"}`}
+                      />
+                      <p
+                        className={`mt-2 text-xs font-bold uppercase ${index + 1 <= step ? "text-foreground" : "text-muted-foreground"}`}
+                      >
                         0{index + 1} {label}
                       </p>
                     </div>
@@ -631,17 +695,29 @@ function ArenaStories() {
                   </div>
                   <div className="flex gap-2">
                     <Button
-                      size="icon" variant="sportOutline"
+                      size="icon"
+                      variant="sportOutline"
                       aria-label="Previous day"
                       disabled={dayIndex === 0}
-                      onClick={() => { setDayIndex((v) => Math.max(0, v - 1)); setSlotId(""); }}
-                    ><ChevronLeft /></Button>
+                      onClick={() => {
+                        setDayIndex((v) => Math.max(0, v - 1));
+                        setSlotId("");
+                      }}
+                    >
+                      <ChevronLeft />
+                    </Button>
                     <Button
-                      size="icon" variant="sportOutline"
+                      size="icon"
+                      variant="sportOutline"
                       aria-label="Next day"
                       disabled={dayIndex >= days.length - 1}
-                      onClick={() => { setDayIndex((v) => Math.min(days.length - 1, v + 1)); setSlotId(""); }}
-                    ><ChevronRight /></Button>
+                      onClick={() => {
+                        setDayIndex((v) => Math.min(days.length - 1, v + 1));
+                        setSlotId("");
+                      }}
+                    >
+                      <ChevronRight />
+                    </Button>
                   </div>
                 </div>
 
@@ -656,7 +732,10 @@ function ArenaStories() {
                         variant={selected ? "sport" : "sportOutline"}
                         disabled={booked}
                         className="h-16 flex-col"
-                        onClick={() => { setSlotId(slot.id); setBooking(null); }}
+                        onClick={() => {
+                          setSlotId(slot.id);
+                          setBooking(null);
+                        }}
                       >
                         <span>{formatTime(slot.start_time)}</span>
                         <span className="text-[10px] normal-case opacity-65">
@@ -671,7 +750,10 @@ function ArenaStories() {
                 <div className="mt-8 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
                   {/* Captain's name */}
                   <div>
-                    <label htmlFor="player-name" className="text-xs font-bold uppercase text-muted-foreground">
+                    <label
+                      htmlFor="player-name"
+                      className="text-xs font-bold uppercase text-muted-foreground"
+                    >
                       Captain's name
                     </label>
                     <input
@@ -685,13 +767,25 @@ function ArenaStories() {
 
                   {/* Team size stepper */}
                   <div>
-                    <label className="text-xs font-bold uppercase text-muted-foreground">Players</label>
+                    <label className="text-xs font-bold uppercase text-muted-foreground">
+                      Players
+                    </label>
                     <div className="mt-2 flex h-12 items-center border border-input">
-                      <Button size="icon" variant="ghost" aria-label="Remove player" onClick={() => setTeamSize((v) => Math.max(1, v - 1))}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Remove player"
+                        onClick={() => setTeamSize((v) => Math.max(1, v - 1))}
+                      >
                         <Minus />
                       </Button>
                       <span className="w-12 text-center font-bold">{teamSize}</span>
-                      <Button size="icon" variant="ghost" aria-label="Add player" onClick={() => setTeamSize((v) => Math.min(22, v + 1))}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="Add player"
+                        onClick={() => setTeamSize((v) => Math.min(22, v + 1))}
+                      >
                         <Plus />
                       </Button>
                     </div>
@@ -700,14 +794,20 @@ function ArenaStories() {
 
                 {/* Error message */}
                 {error && (
-                  <p role="alert" className="mt-4 border-l-4 border-status-danger bg-muted p-3 text-sm font-semibold">
+                  <p
+                    role="alert"
+                    className="mt-4 border-l-4 border-status-danger bg-muted p-3 text-sm font-semibold"
+                  >
                     {error}
                   </p>
                 )}
               </div>
 
               {/* ── Right: summary + confirmation panel ── */}
-              <aside id="status" className="self-start border border-border bg-card p-6 lg:sticky lg:top-24">
+              <aside
+                id="status"
+                className="self-start border border-border bg-card p-6 lg:sticky lg:top-24"
+              >
                 {booking ? (
                   /* ── Booking confirmed state ── */
                   <div className="text-center">
@@ -715,13 +815,25 @@ function ArenaStories() {
                     <div className="relative mx-auto grid h-16 w-16 place-items-center bg-primary text-primary-foreground">
                       <Check className="h-8 w-8" />
                       {/* Decorative confetti dots */}
-                      {["-top-2 -left-2", "-top-2 -right-2", "-bottom-2 -left-2", "-bottom-2 -right-2"].map((pos) => (
-                        <span key={pos} className={`confetti-dot absolute h-3 w-3 rounded-full bg-gold ${pos}`} />
+                      {[
+                        "-top-2 -left-2",
+                        "-top-2 -right-2",
+                        "-bottom-2 -left-2",
+                        "-bottom-2 -right-2",
+                      ].map((pos) => (
+                        <span
+                          key={pos}
+                          className={`confetti-dot absolute h-3 w-3 rounded-full bg-gold ${pos}`}
+                        />
                       ))}
                     </div>
-                    <p className="mt-5 text-xs font-bold uppercase text-status-success">Booking confirmed</p>
+                    <p className="mt-5 text-xs font-bold uppercase text-status-success">
+                      Booking confirmed
+                    </p>
                     <h3 className="mt-2 font-display text-5xl">YOU'RE IN.</h3>
-                    <p className="mt-3 text-muted-foreground">Show this code when you arrive at the pitch.</p>
+                    <p className="mt-3 text-muted-foreground">
+                      Show this code when you arrive at the pitch.
+                    </p>
                     {/* Booking code — styled prominently */}
                     <p className="mt-6 border-y border-border py-5 font-display text-4xl tracking-widest text-primary">
                       {booking.booking_code}
@@ -732,7 +844,11 @@ function ArenaStories() {
                     <Button
                       className="mt-6 w-full"
                       variant="sportOutline"
-                      onClick={() => { setBooking(null); setSlotId(""); setPlayerName(""); }}
+                      onClick={() => {
+                        setBooking(null);
+                        setSlotId("");
+                        setPlayerName("");
+                      }}
                     >
                       Book another match
                     </Button>
@@ -744,11 +860,21 @@ function ArenaStories() {
                     <h3 className="mt-2 font-display text-4xl">{venue.name}</h3>
 
                     <div className="mt-6 space-y-4 border-y border-border py-5 text-sm">
-                      <Summary label="Location" value={venue.location.split("•")[1]?.trim() ?? venue.location} />
-                      <Summary label="Date" value={activeDate ? formatDay(activeDate) : "Select a date"} />
+                      <Summary
+                        label="Location"
+                        value={venue.location.split("•")[1]?.trim() ?? venue.location}
+                      />
+                      <Summary
+                        label="Date"
+                        value={activeDate ? formatDay(activeDate) : "Select a date"}
+                      />
                       <Summary
                         label="Kick-off"
-                        value={chosenSlot ? `${formatTime(chosenSlot.start_time)} · ${chosenSlot.duration_minutes} min` : "Select a slot"}
+                        value={
+                          chosenSlot
+                            ? `${formatTime(chosenSlot.start_time)} · ${chosenSlot.duration_minutes} min`
+                            : "Select a slot"
+                        }
                       />
                       <Summary label="Squad" value={`${teamSize} players`} />
                     </div>
@@ -756,7 +882,8 @@ function ArenaStories() {
                     <div className="flex items-end justify-between py-6">
                       <span className="text-sm text-muted-foreground">Total</span>
                       <span className="font-display text-5xl">
-                        ₹{chosenSlot
+                        ₹
+                        {chosenSlot
                           ? venue.price_per_hour * (chosenSlot.duration_minutes / 60)
                           : venue.price_per_hour}
                       </span>
@@ -806,7 +933,6 @@ function ArenaStories() {
             </div>
           </div>
         </footer>
-
       </main>
     </div>
   );
@@ -831,7 +957,9 @@ function SectionTitle({
       <p className="font-display text-5xl text-primary">/{number}</p>
       <div className="min-w-0">
         <p className="text-xs font-bold uppercase text-muted-foreground">{kicker}</p>
-        <h2 className="mt-2 font-display text-5xl leading-[0.9] sm:text-7xl lg:text-8xl">{title}</h2>
+        <h2 className="mt-2 font-display text-5xl leading-[0.9] sm:text-7xl lg:text-8xl">
+          {title}
+        </h2>
       </div>
     </div>
   );

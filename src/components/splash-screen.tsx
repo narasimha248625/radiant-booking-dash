@@ -16,7 +16,9 @@ export function SplashScreen() {
   if (!show) return null;
 
   return (
-    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background transition-opacity duration-700 ${animateOut ? "opacity-0" : "opacity-100"}`}>
+    <div
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background transition-opacity duration-700 ${animateOut ? "opacity-0" : "opacity-100"}`}
+    >
       <BrandLogo size={120} glow={true} className="animate-pulse" />
       <h1 className="mt-8 font-display text-5xl tracking-tight text-foreground sm:text-6xl">
         <span className="brand-shimmer">ARENA</span>

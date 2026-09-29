@@ -1,10 +1,24 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { getAdminData, addVenueAdmin, removeVenueAdmin, updateVenueAdmin, addSlotAdmin, removeSlotAdmin } from "@/lib/admin.functions";
+import {
+  getAdminData,
+  addVenueAdmin,
+  removeVenueAdmin,
+  updateVenueAdmin,
+  addSlotAdmin,
+  removeSlotAdmin,
+} from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -23,7 +37,7 @@ function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  
+
   const { venues, bookings, slots } = Route.useLoaderData();
   const router = useRouter();
   const addVenueFn = useServerFn(addVenueAdmin);
@@ -31,7 +45,7 @@ function AdminPanel() {
   const updateVenueFn = useServerFn(updateVenueAdmin);
   const addSlotFn = useServerFn(addSlotAdmin);
   const removeSlotFn = useServerFn(removeSlotAdmin);
-  
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSlotLoading, setIsSlotLoading] = useState(false);
@@ -73,7 +87,7 @@ function AdminPanel() {
             toast.success("New booking received!");
           }
           router.invalidate();
-        }
+        },
       )
       .subscribe();
 
@@ -104,17 +118,23 @@ function AdminPanel() {
     setIsLoading(true);
     try {
       if (editingId) {
-        const result = await updateVenueFn({ data: { id: editingId, ...newVenue, price_per_hour: Number(newVenue.price_per_hour) } });
+        const result = await updateVenueFn({
+          data: { id: editingId, ...newVenue, price_per_hour: Number(newVenue.price_per_hour) },
+        });
         if (result.success) {
           toast.success("Turf updated successfully");
           setNewVenue({ name: "", location: "", description: "", price_per_hour: 0 });
           setEditingId(null);
           router.invalidate(); // Refresh data
         } else {
-          toast.error(result.error || "Failed to update Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?");
+          toast.error(
+            result.error || "Failed to update Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?",
+          );
         }
       } else {
-        const result = await addVenueFn({ data: { ...newVenue, price_per_hour: Number(newVenue.price_per_hour) } });
+        const result = await addVenueFn({
+          data: { ...newVenue, price_per_hour: Number(newVenue.price_per_hour) },
+        });
         if (result.success) {
           toast.success("Turf added successfully");
           setNewVenue({ name: "", location: "", description: "", price_per_hour: 0 });
@@ -149,14 +169,16 @@ function AdminPanel() {
     e.preventDefault();
     setIsSlotLoading(true);
     try {
-      const result = await addSlotFn({ data: { 
-        ...newSlot,
-        duration_minutes: Number(newSlot.duration_minutes),
-        capacity: Number(newSlot.capacity)
-      } });
+      const result = await addSlotFn({
+        data: {
+          ...newSlot,
+          duration_minutes: Number(newSlot.duration_minutes),
+          capacity: Number(newSlot.capacity),
+        },
+      });
       if (result.success) {
         toast.success("Slot added successfully");
-        setNewSlot({ ...newSlot, court_label: "", start_time: "" }); 
+        setNewSlot({ ...newSlot, court_label: "", start_time: "" });
         router.invalidate();
       } else {
         toast.error(result.error || "Failed to add slot");
@@ -184,8 +206,13 @@ function AdminPanel() {
   };
 
   const handleRemoveVenue = async (id: string) => {
-    if (!window.confirm("Are you sure you want to remove this turf? This might affect existing bookings.")) return;
-    
+    if (
+      !window.confirm(
+        "Are you sure you want to remove this turf? This might affect existing bookings.",
+      )
+    )
+      return;
+
     try {
       const result = await removeVenueFn({ data: { id } });
       if (result.success) {
@@ -193,7 +220,9 @@ function AdminPanel() {
         if (editingId === id) handleCancelEdit();
         router.invalidate();
       } else {
-        toast.error(result.error || "Failed to remove Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?");
+        toast.error(
+          result.error || "Failed to remove Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?",
+        );
       }
     } catch (err: any) {
       toast.error(err.message || "An error occurred");
@@ -213,7 +242,9 @@ function AdminPanel() {
           <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 text-white shadow-2xl">
             <CardHeader>
               <CardTitle className="text-2xl font-bold">Admin Login</CardTitle>
-              <CardDescription className="text-zinc-400">Enter your credentials to access the admin panel.</CardDescription>
+              <CardDescription className="text-zinc-400">
+                Enter your credentials to access the admin panel.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-4">
@@ -241,7 +272,10 @@ function AdminPanel() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold">
+                <Button
+                  type="submit"
+                  className="w-full bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold"
+                >
                   Login
                 </Button>
               </form>
@@ -263,26 +297,49 @@ function AdminPanel() {
       <div className="relative z-10 w-full max-w-6xl mx-auto flex-1 flex flex-col min-h-0 space-y-4">
         <div className="flex justify-between items-center shrink-0">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-md">Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-md">
+              Admin Dashboard
+            </h1>
             <p className="text-zinc-300 mt-1 drop-shadow-md">Manage turfs, bookings, and users.</p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800">
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800"
+          >
             Logout
           </Button>
         </div>
 
         <Tabs defaultValue="bookings" className="w-full flex-1 flex flex-col min-h-0">
           <TabsList className="bg-zinc-900 border border-zinc-800 mb-4 shrink-0">
-            <TabsTrigger value="bookings" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white">Bookings & Users</TabsTrigger>
-            <TabsTrigger value="turfs" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white">Turfs (Pitches)</TabsTrigger>
-            <TabsTrigger value="slots" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white">Slots</TabsTrigger>
+            <TabsTrigger
+              value="bookings"
+              className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
+            >
+              Bookings & Users
+            </TabsTrigger>
+            <TabsTrigger
+              value="turfs"
+              className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
+            >
+              Turfs (Pitches)
+            </TabsTrigger>
+            <TabsTrigger
+              value="slots"
+              className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
+            >
+              Slots
+            </TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="bookings" className="space-y-4 mt-0">
             <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl">
               <CardHeader>
                 <CardTitle className="text-white">Recent Bookings</CardTitle>
-                <CardDescription className="text-zinc-400">List of users who booked slots on the platform.</CardDescription>
+                <CardDescription className="text-zinc-400">
+                  List of users who booked slots on the platform.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {bookings.length > 0 ? (
@@ -300,15 +357,24 @@ function AdminPanel() {
                       </TableHeader>
                       <TableBody>
                         {bookings.map((booking: any) => (
-                          <TableRow key={booking.id} className="border-zinc-800 hover:bg-zinc-800/50">
-                            <TableCell className="font-medium text-white">{booking.booking_code}</TableCell>
+                          <TableRow
+                            key={booking.id}
+                            className="border-zinc-800 hover:bg-zinc-800/50"
+                          >
+                            <TableCell className="font-medium text-white">
+                              {booking.booking_code}
+                            </TableCell>
                             <TableCell className="text-zinc-300">{booking.player_name}</TableCell>
-                            <TableCell className="text-zinc-300">{booking.venues?.name || "Unknown"}</TableCell>
+                            <TableCell className="text-zinc-300">
+                              {booking.venues?.name || "Unknown"}
+                            </TableCell>
                             <TableCell className="text-zinc-300">
                               {booking.slots?.slot_date} {booking.slots?.start_time}
                             </TableCell>
                             <TableCell className="text-zinc-300">{booking.team_size}</TableCell>
-                            <TableCell className="text-right text-[#00D084]">₹{booking.amount}</TableCell>
+                            <TableCell className="text-right text-[#00D084]">
+                              ₹{booking.amount}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -320,21 +386,27 @@ function AdminPanel() {
               </CardContent>
             </Card>
           </TabsContent>
-          
+
           <TabsContent value="turfs" className="flex-1 min-h-0 mt-0">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-0">
               <div className="md:col-span-1 h-full overflow-y-auto pr-2 pb-2">
                 <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl">
                   <CardHeader>
-                    <CardTitle className="text-white">{editingId ? "Update Turf" : "Add New Turf"}</CardTitle>
+                    <CardTitle className="text-white">
+                      {editingId ? "Update Turf" : "Add New Turf"}
+                    </CardTitle>
                     <CardDescription className="text-zinc-400">
-                      {editingId ? "Update the details of the selected pitch." : "Create a new pitch for users to select."}
+                      {editingId
+                        ? "Update the details of the selected pitch."
+                        : "Create a new pitch for users to select."}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleAddOrUpdateVenue} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name" className="text-zinc-300">Name</Label>
+                        <Label htmlFor="name" className="text-zinc-300">
+                          Name
+                        </Label>
                         <Input
                           id="name"
                           value={newVenue.name}
@@ -345,7 +417,9 @@ function AdminPanel() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="location" className="text-zinc-300">Location</Label>
+                        <Label htmlFor="location" className="text-zinc-300">
+                          Location
+                        </Label>
                         <Input
                           id="location"
                           value={newVenue.location}
@@ -356,35 +430,53 @@ function AdminPanel() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="price" className="text-zinc-300">Price per Hour (₹)</Label>
+                        <Label htmlFor="price" className="text-zinc-300">
+                          Price per Hour (₹)
+                        </Label>
                         <Input
                           id="price"
                           type="number"
                           min="0"
                           value={newVenue.price_per_hour}
-                          onChange={(e) => setNewVenue({ ...newVenue, price_per_hour: e.target.value as any })}
+                          onChange={(e) =>
+                            setNewVenue({ ...newVenue, price_per_hour: e.target.value as any })
+                          }
                           className="bg-zinc-800 border-zinc-700 text-white"
                           placeholder="1500"
                           required
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="desc" className="text-zinc-300">Description</Label>
+                        <Label htmlFor="desc" className="text-zinc-300">
+                          Description
+                        </Label>
                         <Input
                           id="desc"
                           value={newVenue.description}
-                          onChange={(e) => setNewVenue({ ...newVenue, description: e.target.value })}
+                          onChange={(e) =>
+                            setNewVenue({ ...newVenue, description: e.target.value })
+                          }
                           className="bg-zinc-800 border-zinc-700 text-white"
                           placeholder="A great place to play..."
                           required
                         />
                       </div>
                       <div className="flex gap-2 mt-4">
-                        <Button type="submit" disabled={isLoading} className="flex-1 bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold">
-                          {isLoading ? "Saving..." : (editingId ? "Update Turf" : "Add Turf")}
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className="flex-1 bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold"
+                        >
+                          {isLoading ? "Saving..." : editingId ? "Update Turf" : "Add Turf"}
                         </Button>
                         {editingId && (
-                          <Button type="button" variant="outline" disabled={isLoading} onClick={handleCancelEdit} className="border-zinc-700 text-white hover:bg-zinc-800">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isLoading}
+                            onClick={handleCancelEdit}
+                            className="border-zinc-700 text-white hover:bg-zinc-800"
+                          >
                             Cancel
                           </Button>
                         )}
@@ -393,7 +485,7 @@ function AdminPanel() {
                   </CardContent>
                 </Card>
               </div>
-              
+
               <div className="md:col-span-2 h-full min-h-0">
                 <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl h-full flex flex-col">
                   <CardHeader className="shrink-0">
@@ -412,22 +504,27 @@ function AdminPanel() {
                         </TableHeader>
                         <TableBody>
                           {venues.map((venue: any) => (
-                            <TableRow key={venue.id} className="border-zinc-800 hover:bg-zinc-800/50">
+                            <TableRow
+                              key={venue.id}
+                              className="border-zinc-800 hover:bg-zinc-800/50"
+                            >
                               <TableCell className="font-medium text-white">{venue.name}</TableCell>
                               <TableCell className="text-zinc-300">{venue.location}</TableCell>
-                              <TableCell className="text-right text-[#00D084]">₹{venue.price_per_hour}</TableCell>
+                              <TableCell className="text-right text-[#00D084]">
+                                ₹{venue.price_per_hour}
+                              </TableCell>
                               <TableCell className="text-right space-x-2">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() => handleEditClick(venue)}
                                   className="border-zinc-700 text-white hover:bg-zinc-800"
                                 >
                                   Edit
                                 </Button>
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm" 
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
                                   onClick={() => handleRemoveVenue(venue.id)}
                                   className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white"
                                 >
@@ -458,7 +555,9 @@ function AdminPanel() {
                   <CardContent>
                     <form onSubmit={handleAddSlot} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="venue_id" className="text-zinc-300">Venue</Label>
+                        <Label htmlFor="venue_id" className="text-zinc-300">
+                          Venue
+                        </Label>
                         <select
                           id="venue_id"
                           value={newSlot.venue_id}
@@ -466,14 +565,20 @@ function AdminPanel() {
                           className="flex h-9 w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm text-white shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
                           required
                         >
-                          <option value="" disabled>Select Turf</option>
+                          <option value="" disabled>
+                            Select Turf
+                          </option>
                           {venues.map((v: any) => (
-                            <option key={v.id} value={v.id}>{v.name}</option>
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
                           ))}
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="slot_date" className="text-zinc-300">Date</Label>
+                        <Label htmlFor="slot_date" className="text-zinc-300">
+                          Date
+                        </Label>
                         <Input
                           id="slot_date"
                           type="date"
@@ -484,7 +589,9 @@ function AdminPanel() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="start_time" className="text-zinc-300">Start Time</Label>
+                        <Label htmlFor="start_time" className="text-zinc-300">
+                          Start Time
+                        </Label>
                         <Input
                           id="start_time"
                           type="time"
@@ -495,11 +602,15 @@ function AdminPanel() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="duration" className="text-zinc-300">Duration (mins)</Label>
+                        <Label htmlFor="duration" className="text-zinc-300">
+                          Duration (mins)
+                        </Label>
                         <select
                           id="duration"
                           value={newSlot.duration_minutes}
-                          onChange={(e) => setNewSlot({ ...newSlot, duration_minutes: Number(e.target.value) })}
+                          onChange={(e) =>
+                            setNewSlot({ ...newSlot, duration_minutes: Number(e.target.value) })
+                          }
                           className="flex h-9 w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1 text-sm text-white shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-300 disabled:cursor-not-allowed disabled:opacity-50"
                           required
                         >
@@ -509,7 +620,9 @@ function AdminPanel() {
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="court_label" className="text-zinc-300">Court Label</Label>
+                        <Label htmlFor="court_label" className="text-zinc-300">
+                          Court Label
+                        </Label>
                         <Input
                           id="court_label"
                           value={newSlot.court_label}
@@ -520,19 +633,27 @@ function AdminPanel() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="capacity" className="text-zinc-300">Capacity</Label>
+                        <Label htmlFor="capacity" className="text-zinc-300">
+                          Capacity
+                        </Label>
                         <Input
                           id="capacity"
                           type="number"
                           min="1"
                           value={newSlot.capacity}
-                          onChange={(e) => setNewSlot({ ...newSlot, capacity: Number(e.target.value) })}
+                          onChange={(e) =>
+                            setNewSlot({ ...newSlot, capacity: Number(e.target.value) })
+                          }
                           className="bg-zinc-800 border-zinc-700 text-white"
                           required
                         />
                       </div>
                       <div className="flex gap-2 mt-4">
-                        <Button type="submit" disabled={isSlotLoading} className="flex-1 bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold">
+                        <Button
+                          type="submit"
+                          disabled={isSlotLoading}
+                          className="flex-1 bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold"
+                        >
                           {isSlotLoading ? "Saving..." : "Add Slot"}
                         </Button>
                       </div>
@@ -540,7 +661,7 @@ function AdminPanel() {
                   </CardContent>
                 </Card>
               </div>
-              
+
               <div className="md:col-span-2 h-full min-h-0">
                 <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl h-full flex flex-col">
                   <CardHeader className="shrink-0">
@@ -559,24 +680,32 @@ function AdminPanel() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {slots && slots.map((slot: any) => (
-                            <TableRow key={slot.id} className="border-zinc-800 hover:bg-zinc-800/50">
-                              <TableCell className="font-medium text-white">{slot.venues?.name}</TableCell>
-                              <TableCell className="text-zinc-300">{slot.slot_date}</TableCell>
-                              <TableCell className="text-zinc-300">{slot.start_time} ({slot.duration_minutes}m)</TableCell>
-                              <TableCell className="text-zinc-300">{slot.court_label}</TableCell>
-                              <TableCell className="text-right space-x-2">
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm" 
-                                  onClick={() => handleRemoveSlot(slot.id)}
-                                  className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white"
-                                >
-                                  Remove
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
+                          {slots &&
+                            slots.map((slot: any) => (
+                              <TableRow
+                                key={slot.id}
+                                className="border-zinc-800 hover:bg-zinc-800/50"
+                              >
+                                <TableCell className="font-medium text-white">
+                                  {slot.venues?.name}
+                                </TableCell>
+                                <TableCell className="text-zinc-300">{slot.slot_date}</TableCell>
+                                <TableCell className="text-zinc-300">
+                                  {slot.start_time} ({slot.duration_minutes}m)
+                                </TableCell>
+                                <TableCell className="text-zinc-300">{slot.court_label}</TableCell>
+                                <TableCell className="text-right space-x-2">
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleRemoveSlot(slot.id)}
+                                    className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white"
+                                  >
+                                    Remove
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
                         </TableBody>
                       </Table>
                     </div>

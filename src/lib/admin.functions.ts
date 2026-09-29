@@ -4,7 +4,7 @@ import { z } from "zod";
 export const getAdminData = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    
+
     // Fetch venues
     const { data: venues, error: venuesError } = await supabaseAdmin
       .from("venues")
@@ -53,17 +53,19 @@ export const addVenueAdmin = createServerFn({ method: "POST" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: venue, error } = await supabaseAdmin
         .from("venues")
-        .insert([{
-          ...data,
-          active: true,
-          featured: false,
-          rating: 5.0,
-          amenities: ["Floodlights", "Changing room", "Free parking"],
-          image_key: "hero",
-        }])
+        .insert([
+          {
+            ...data,
+            active: true,
+            featured: false,
+            rating: 5.0,
+            amenities: ["Floodlights", "Changing room", "Free parking"],
+            image_key: "hero",
+          },
+        ])
         .select()
         .single();
-      
+
       if (error) throw new Error(error.message);
       return { success: true, venue };
     } catch (err: any) {
@@ -81,12 +83,18 @@ export const removeVenueAdmin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { error } = await supabaseAdmin
+      const { data: deletedData, error } = await supabaseAdmin
         .from("venues")
         .delete()
-        .eq("id", data.id);
-      
+        .eq("id", data.id)
+        .select();
+
       if (error) throw new Error(error.message);
+      if (!deletedData || deletedData.length === 0) {
+        throw new Error(
+          "Turf not deleted. Check if it has active bookings/slots, or if SUPABASE_SERVICE_ROLE_KEY is configured correctly.",
+        );
+      }
       return { success: true };
     } catch (err: any) {
       console.error("[removeVenueAdmin] Failed to remove venue:", err);
@@ -108,11 +116,8 @@ export const updateVenueAdmin = createServerFn({ method: "POST" })
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { id, ...updates } = data;
-      const { error } = await supabaseAdmin
-        .from("venues")
-        .update(updates)
-        .eq("id", id);
-      
+      const { error } = await supabaseAdmin.from("venues").update(updates).eq("id", id);
+
       if (error) throw new Error(error.message);
       return { success: true };
     } catch (err: any) {
@@ -137,14 +142,16 @@ export const addSlotAdmin = createServerFn({ method: "POST" })
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: slot, error } = await supabaseAdmin
         .from("slots")
-        .insert([{
-          ...data,
-          status: "available",
-          reserved_count: 0
-        }])
+        .insert([
+          {
+            ...data,
+            status: "available",
+            reserved_count: 0,
+          },
+        ])
         .select()
         .single();
-      
+
       if (error) throw new Error(error.message);
       return { success: true, slot };
     } catch (err: any) {
@@ -162,11 +169,8 @@ export const removeSlotAdmin = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { error } = await supabaseAdmin
-        .from("slots")
-        .delete()
-        .eq("id", data.id);
-      
+      const { error } = await supabaseAdmin.from("slots").delete().eq("id", data.id);
+
       if (error) throw new Error(error.message);
       return { success: true };
     } catch (err: any) {
