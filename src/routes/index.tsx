@@ -96,6 +96,17 @@ const imageMap = {
   action: actionImage,
 } as const;
 
+/* Load Razorpay SDK */
+const loadRazorpay = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 /* ─────────────────────────────────────────────────────────
    Main component
    ───────────────────────────────────────────────────────── */
@@ -173,16 +184,57 @@ function ArenaStories() {
     }
     setSubmitting(true);
     setError("");
+    
     try {
-      const result = await submitBooking({
-        data: { venueId: venue.id, slotId, playerName, teamSize },
+      const isLoaded = await loadRazorpay();
+      if (!isLoaded) {
+        throw new Error("Razorpay SDK failed to load. Are you online?");
+      }
+
+      const options = {
+        key: "rzp_test_testkey", // Use a test key for demonstration
+        amount: venue.price_per_hour * 100, // Price in paise
+        currency: "INR",
+        name: "Arena Stories",
+        description: "Premium Box Cricket Booking",
+        handler: async function (response: any) {
+          try {
+            // Payment successful, confirm booking in our system
+            const result = await submitBooking({
+              data: { venueId: venue.id, slotId, playerName, teamSize },
+            });
+            setBooking(result);
+            /* Revalidate server data so slot status updates immediately */
+            await router.invalidate({ sync: true });
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Booking failed after payment.");
+          } finally {
+            setSubmitting(false);
+          }
+        },
+        prefill: {
+          name: playerName,
+        },
+        theme: {
+          color: "#16a34a",
+        },
+        modal: {
+          ondismiss: function () {
+            setSubmitting(false);
+          },
+        },
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.on("payment.failed", function (response: any) {
+        setError("Payment failed: " + response.error.description);
+        setSubmitting(false);
       });
-      setBooking(result);
-      /* Revalidate server data so slot status updates immediately */
-      await router.invalidate({ sync: true });
+      
+      paymentObject.open();
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Booking failed. Please try another slot.");
-    } finally {
+      setError(err instanceof Error ? err.message : "Payment initialization failed.");
       setSubmitting(false);
     }
   }
