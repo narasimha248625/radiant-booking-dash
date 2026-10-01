@@ -33,15 +33,8 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL =
-    process.env["SUPABASE_URL"] ||
-    process.env["VITE_SUPABASE_URL"] ||
-    "https://jbqzwtajdzfvdmbwzcjj.supabase.co";
-  const SUPABASE_SERVICE_ROLE_KEY =
-    process.env["SUPABASE_SERVICE_ROLE_KEY"] ||
-    process.env["SUPABASE_PUBLISHABLE_KEY"] ||
-    process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
-    "sb_publishable_AdcYqRmwnPZyh0qaxr2Rdg_xsIYrkr5";
+  const SUPABASE_URL = "https://jbqzwtajdzfvdmbwzcjj.supabase.co";
+  const SUPABASE_SERVICE_ROLE_KEY = "sb_publishable_AdcYqRmwnPZyh0qaxr2Rdg_xsIYrkr5";
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     const missing = [
