@@ -239,7 +239,18 @@ function ArenaStories() {
     }
   }
 
-  if (!venue) return null;
+  if (!venue) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-background p-6 text-center">
+        <div>
+          <h1 className="font-display text-5xl">NO PITCHES FOUND.</h1>
+          <p className="mt-2 text-muted-foreground">
+            There are currently no active venues available for booking.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className={isDark ? "dark" : ""}>
@@ -553,7 +564,7 @@ function ArenaStories() {
         <section id="pitches" className="px-5 py-20 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-7xl">
             <SectionTitle number="01" kicker="Pick your ground" title="BUILT FOR THE GAME." />
-            <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            <div className={`mt-10 grid gap-5 ${venues.length === 1 ? 'max-w-2xl mx-auto' : 'lg:grid-cols-3'}`}>
               {venues.map((item, index) => (
                 <article
                   key={item.id}
@@ -599,8 +610,8 @@ function ArenaStories() {
                       </p>
                       <p className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
                         <Phone className="h-4 w-4 shrink-0 text-primary" />
-                        <span className="text-primary">+91 70935 93568</span>{" "}
-                        <span className="font-normal">Muttala Ashok</span>
+                        <span className="text-primary">{item.contact_phone || '+91 70935 93568'}</span>{" "}
+                        <span className="font-normal">{item.contact_name || 'ruttala ashok'}</span>
                       </p>
                     </div>
 

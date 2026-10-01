@@ -43,7 +43,17 @@ export const getTurfData = createServerFn({ method: "GET" }).handler(async () =>
       }
     }
 
-    return { venues: finalVenues, slots: finalSlots };
+    // Transform venues to meet the user's specific requirement
+    // Only 1 turf available, with specific address and contact details.
+    const transformedVenues = finalVenues.slice(0, 1).map(v => ({
+      ...v,
+      name: "Arena Stories Box Cricket",
+      location: "Boddepalle, narsipatnam municipality, back side hanuman coffee cafe/ opposite royal park resort, anakapalli district, Andhra Pradesh 531116",
+      contact_phone: "+91 70935 93568",
+      contact_name: "ruttala ashok"
+    }));
+
+    return { venues: transformedVenues, slots: finalSlots };
   } catch (err) {
     console.error("[getTurfData] Failed to connect to Supabase:", err);
     throw new Error("Failed to fetch data from database.");
