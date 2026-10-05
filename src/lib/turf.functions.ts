@@ -1,6 +1,99 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+const DEFAULT_VENUES = [
+  {
+    id: "0100dadc-1e8b-47a1-a806-c46201f8e58c",
+    name: "Apex Floodlight Arena",
+    location: "Bengaluru • Indiranagar",
+    description: "Championship-grade 5v5 turf built for fast night box cricket and football.",
+    price_per_hour: 1800,
+    rating: 4.9,
+    amenities: ["FIFA turf", "Floodlights", "Changing room", "Free parking"],
+    image_key: "hero",
+    featured: true,
+    active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "0200dadc-1e8b-47a1-a806-c46201f8e58d",
+    name: "Skyline Sports Yard",
+    location: "Bengaluru • Koramangala",
+    description: "An elevated urban court with skyline views, pro-grade lighting, and spectator lounge.",
+    price_per_hour: 2200,
+    rating: 4.8,
+    amenities: ["7v7 court", "Showers", "Cafe", "Equipment"],
+    image_key: "aerial",
+    featured: false,
+    active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "0300dadc-1e8b-47a1-a806-c46201f8e58e",
+    name: "Carbon Field House",
+    location: "Bengaluru • HSR Layout",
+    description: "A focused training ground for competitive squads and weekly leagues.",
+    price_per_hour: 1600,
+    rating: 4.7,
+    amenities: ["5v5 court", "Lockers", "First aid", "Drinking water"],
+    image_key: "action",
+    featured: false,
+    active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+function generateFallbackSlots(venues: Array<{ id: string }>) {
+  const times = ["17:00:00", "18:30:00", "20:00:00", "21:30:00"];
+  const courts = ["A1", "B1"];
+  const generatedSlots: Array<{
+    id: string;
+    venue_id: string;
+    slot_date: string;
+    start_time: string;
+    duration_minutes: number;
+    court_label: string;
+    capacity: number;
+    reserved_count: number;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  }> = [];
+
+  const baseDate = new Date();
+  for (let d = 0; d < 7; d++) {
+    const curDate = new Date(baseDate);
+    curDate.setDate(baseDate.getDate() + d);
+    const dateStr = curDate.toISOString().slice(0, 10);
+
+    for (const venue of venues) {
+      for (let t = 0; t < times.length; t++) {
+        for (let c = 0; c < courts.length; c++) {
+          const isBooked = (d + t + c) % 5 === 0;
+          const time = times[t]!;
+          const court = courts[c]!;
+          generatedSlots.push({
+            id: `slot-${venue.id.slice(0, 8)}-${dateStr}-${time.slice(0, 2)}${court}`,
+            venue_id: venue.id,
+            slot_date: dateStr,
+            start_time: time,
+            duration_minutes: 60,
+            court_label: court,
+            capacity: 1,
+            reserved_count: isBooked ? 1 : 0,
+            status: isBooked ? "booked" : "available",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+    }
+  }
+  return generatedSlots;
+}
 export const getTurfData = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
