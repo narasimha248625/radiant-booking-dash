@@ -73,13 +73,15 @@ function generateFallbackSlots(venues: Array<{ id: string }>) {
       for (let t = 0; t < times.length; t++) {
         for (let c = 0; c < courts.length; c++) {
           const isBooked = (d + t + c) % 5 === 0;
+          const time = times[t]!;
+          const court = courts[c]!;
           generatedSlots.push({
-            id: `slot-${venue.id.slice(0, 8)}-${dateStr}-${times[t].slice(0, 2)}${courts[c]}`,
+            id: `slot-${venue.id.slice(0, 8)}-${dateStr}-${time.slice(0, 2)}${court}`,
             venue_id: venue.id,
             slot_date: dateStr,
-            start_time: times[t],
+            start_time: time,
             duration_minutes: 60,
-            court_label: courts[c],
+            court_label: court,
             capacity: 1,
             reserved_count: isBooked ? 1 : 0,
             status: isBooked ? "booked" : "available",
