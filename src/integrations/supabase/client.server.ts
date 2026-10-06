@@ -29,13 +29,8 @@ function createSupabaseAdminClient() {
     );
   }
 
-  if (
-    !serviceRoleKey.startsWith("sb_secret_") &&
-    !serviceRoleKey.startsWith("eyJ")
-  ) {
-    throw new Error(
-      "SUPABASE_SERVICE_ROLE_KEY is not a valid Supabase secret/service-role key.",
-    );
+  if (!serviceRoleKey.startsWith("sb_secret_") && !serviceRoleKey.startsWith("eyJ")) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is not a valid Supabase secret/service-role key.");
   }
 
   return createClient<Database>(supabaseUrl, serviceRoleKey, {
@@ -48,21 +43,16 @@ function createSupabaseAdminClient() {
   });
 }
 
-let _supabaseAdmin:
-  | ReturnType<typeof createSupabaseAdminClient>
-  | undefined;
+let _supabaseAdmin: ReturnType<typeof createSupabaseAdminClient> | undefined;
 
 // Lazily initialize the client so environment variables are read
 // only when a server handler actually uses Supabase.
-export const supabaseAdmin = new Proxy(
-  {} as ReturnType<typeof createSupabaseAdminClient>,
-  {
-    get(_, prop, receiver) {
-      if (!_supabaseAdmin) {
-        _supabaseAdmin = createSupabaseAdminClient();
-      }
+export const supabaseAdmin = new Proxy({} as ReturnType<typeof createSupabaseAdminClient>, {
+  get(_, prop, receiver) {
+    if (!_supabaseAdmin) {
+      _supabaseAdmin = createSupabaseAdminClient();
+    }
 
-      return Reflect.get(_supabaseAdmin, prop, receiver);
-    },
+    return Reflect.get(_supabaseAdmin, prop, receiver);
   },
-);
+});
