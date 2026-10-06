@@ -29,3 +29,26 @@ Copy `.env.example` to `.env` and configure the server-only Supabase secret key,
 UPI ID (`UPI_VPA`), and the permitted admin email address. Apply the Supabase migrations before
 accepting bookings. Customers can open PhonePe, Google Pay, Paytm, BHIM, or another UPI app and
 submit their UTR; the admin then approves or rejects that payment from `/admin`.
+
+## Deploy to Vercel
+
+Import this repository in Vercel with the `main` branch. The committed `vercel.json`
+selects TanStack Start; keep the detected build command (`npm run build`) and output
+settings. Add the following environment variables under **Project Settings →
+Environment Variables** for Production (and Preview if you use preview deployments):
+
+| Variable | Value | Visibility |
+| --- | --- | --- |
+| `SUPABASE_URL` | `https://jbqzwtajdzfvdmbwzcjj.supabase.co` | Server |
+| `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_AdcYqRmwnPZyh0qaxr2Rdg_xsIYrkr5` | Server, public key |
+| `VITE_SUPABASE_URL` | Same project URL | Browser build |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Same publishable key | Browser build |
+| `SUPABASE_SERVICE_ROLE_KEY` | This project's `sb_secret_...` key from Supabase Dashboard | **Server only** |
+| `UPI_VPA` | Merchant UPI ID, for example `business@bank` | **Server only** |
+| `UPI_PAYEE_NAME` | Name shown in UPI apps, for example `Arena Stories` | Server |
+| `ADMIN_EMAILS` | Comma-separated Supabase Auth admin email addresses | Server |
+
+Do not add `SUPABASE_ACCESS_TOKEN` to Vercel: it is needed only to apply database
+migrations. Never prefix the service-role key or UPI VPA with `VITE_`. The deployed
+project needs the SQL migrations in `supabase/migrations` applied to the same
+Supabase project. Redeploy after changing any environment variable.
