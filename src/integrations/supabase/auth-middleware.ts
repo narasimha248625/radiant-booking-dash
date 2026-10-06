@@ -103,3 +103,23 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
     });
   },
 );
+
+export const requireAdminAuth = createMiddleware({ type: "function" })
+  .middleware([requireSupabaseAuth])
+  .server(async ({ context, next }) => {
+    const claims = context.claims as Record<string, unknown>;
+    const appMetadata = (claims["app_metadata"] ?? {}) as Record<string, unknown>;
+    const userMetadata = (claims["user_metadata"] ?? {}) as Record<string, unknown>;
+    const email = typeof claims["email"] === "string" ? claims["email"].toLowerCase() : "";
+    const configuredEmails = (process.env["ADMIN_EMAILS"] || process.env["ADMIN_EMAIL"] || "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+    const hasAdminRole = appMetadata["role"] === "admin" || userMetadata["role"] === "admin";
+
+    if (!hasAdminRole && !configuredEmails.includes(email)) {
+      throw new Error("Forbidden: This account is not an administrator");
+    }
+
+    return next({ context });
+  });

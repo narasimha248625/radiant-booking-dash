@@ -1,6 +1,6 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getAdminData,
   addVenueAdmin,
@@ -8,6 +8,7 @@ import {
   updateVenueAdmin,
   addSlotAdmin,
   removeSlotAdmin,
+  reviewUpiPaymentAdmin,
 } from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,27 +25,59 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import heroImage from "@/assets/turf-hero.jpg";
+
+type AdminVenue = Tables<"venues">;
+type AdminBooking = Tables<"bookings"> & {
+  venues: { name: string } | null;
+  slots: { slot_date: string; start_time: string; duration_minutes: number } | null;
+  booking_slots:
+    | {
+        slots: {
+          slot_date: string;
+          start_time: string;
+          duration_minutes: number;
+          court_label: string;
+        } | null;
+      }[]
+    | null;
+};
+type AdminSlot = Tables<"slots"> & { venues: { name: string } | null };
+
+function messageFrom(error: unknown) {
+  return error instanceof Error ? error.message : "An error occurred";
+}
 
 export const Route = createFileRoute("/admin")({
   component: AdminPanel,
-  loader: async () => {
-    return await getAdminData();
-  },
 });
 
 function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [adminData, setAdminData] = useState<{
+    venues: AdminVenue[];
+    bookings: AdminBooking[];
+    slots: AdminSlot[];
+  }>({ venues: [], bookings: [], slots: [] });
 
-  const { venues, bookings, slots } = Route.useLoaderData();
-  const router = useRouter();
+  const { venues, bookings, slots } = adminData;
+  const getAdminDataFn = useServerFn(getAdminData);
   const addVenueFn = useServerFn(addVenueAdmin);
   const removeVenueFn = useServerFn(removeVenueAdmin);
   const updateVenueFn = useServerFn(updateVenueAdmin);
   const addSlotFn = useServerFn(addSlotAdmin);
   const removeSlotFn = useServerFn(removeSlotAdmin);
+  const reviewUpiPaymentFn = useServerFn(reviewUpiPaymentAdmin);
+
+  const refreshAdminData = useCallback(async () => {
+    const result = await getAdminDataFn();
+    setAdminData(result);
+    return result;
+  }, [getAdminDataFn]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,20 +87,37 @@ function AdminPanel() {
     slot_date: "",
     start_time: "",
     duration_minutes: 60,
-    court_label: "",
+    court_label: "Main",
     capacity: 1,
   });
   const [newVenue, setNewVenue] = useState({
     name: "",
     location: "",
     description: "",
-    price_per_hour: 0,
+    price_per_hour: 700,
   });
 
   useEffect(() => {
-    const auth = sessionStorage.getItem("adminAuth");
-    if (auth === "true") setIsAuthenticated(true);
-  }, []);
+    let active = true;
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!active) return;
+      if (!data.session) {
+        setAuthChecking(false);
+        return;
+      }
+      try {
+        await refreshAdminData();
+        if (active) setIsAuthenticated(true);
+      } catch {
+        await supabase.auth.signOut();
+      } finally {
+        if (active) setAuthChecking(false);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [refreshAdminData]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -86,7 +136,7 @@ function AdminPanel() {
           if (payload.eventType === "INSERT") {
             toast.success("New booking received!");
           }
-          router.invalidate();
+          refreshAdminData();
         },
       )
       .subscribe();
@@ -94,22 +144,33 @@ function AdminPanel() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, refreshAdminData]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email === "admin@admin.com" && password === "password") {
+    setIsLoading(true);
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      toast.error("Invalid email or password");
+      setIsLoading(false);
+      return;
+    }
+    try {
+      await refreshAdminData();
       setIsAuthenticated(true);
-      sessionStorage.setItem("adminAuth", "true");
       toast.success("Logged in successfully");
-    } else {
-      toast.error("Invalid credentials");
+    } catch (error) {
+      await supabase.auth.signOut();
+      toast.error(error instanceof Error ? error.message : "This account is not an admin");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
-    sessionStorage.removeItem("adminAuth");
+    setAdminData({ venues: [], bookings: [], slots: [] });
     toast.success("Logged out");
   };
 
@@ -123,9 +184,9 @@ function AdminPanel() {
         });
         if (result.success) {
           toast.success("Turf updated successfully");
-          setNewVenue({ name: "", location: "", description: "", price_per_hour: 0 });
+          setNewVenue({ name: "", location: "", description: "", price_per_hour: 700 });
           setEditingId(null);
-          router.invalidate(); // Refresh data
+          await refreshAdminData();
         } else {
           toast.error(
             result.error || "Failed to update Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?",
@@ -137,20 +198,20 @@ function AdminPanel() {
         });
         if (result.success) {
           toast.success("Turf added successfully");
-          setNewVenue({ name: "", location: "", description: "", price_per_hour: 0 });
-          router.invalidate(); // Refresh data
+          setNewVenue({ name: "", location: "", description: "", price_per_hour: 700 });
+          await refreshAdminData();
         } else {
           toast.error(result.error || "Failed to add Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?");
         }
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err: unknown) {
+      toast.error(messageFrom(err));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEditClick = (venue: any) => {
+  const handleEditClick = (venue: AdminVenue) => {
     setEditingId(venue.id);
     setNewVenue({
       name: venue.name,
@@ -162,7 +223,7 @@ function AdminPanel() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setNewVenue({ name: "", location: "", description: "", price_per_hour: 0 });
+    setNewVenue({ name: "", location: "", description: "", price_per_hour: 700 });
   };
 
   const handleAddSlot = async (e: React.FormEvent) => {
@@ -178,13 +239,13 @@ function AdminPanel() {
       });
       if (result.success) {
         toast.success("Slot added successfully");
-        setNewSlot({ ...newSlot, court_label: "", start_time: "" });
-        router.invalidate();
+        setNewSlot({ ...newSlot, court_label: "Main", start_time: "" });
+        await refreshAdminData();
       } else {
         toast.error(result.error || "Failed to add slot");
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err: unknown) {
+      toast.error(messageFrom(err));
     } finally {
       setIsSlotLoading(false);
     }
@@ -196,12 +257,12 @@ function AdminPanel() {
       const result = await removeSlotFn({ data: { id } });
       if (result.success) {
         toast.success("Slot removed successfully");
-        router.invalidate();
+        await refreshAdminData();
       } else {
         toast.error(result.error || "Failed to remove slot");
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err: unknown) {
+      toast.error(messageFrom(err));
     }
   };
 
@@ -218,16 +279,37 @@ function AdminPanel() {
       if (result.success) {
         toast.success("Turf removed successfully");
         if (editingId === id) handleCancelEdit();
-        router.invalidate();
+        await refreshAdminData();
       } else {
         toast.error(
           result.error || "Failed to remove Turf. Did you add SUPABASE_SERVICE_ROLE_KEY?",
         );
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+    } catch (err: unknown) {
+      toast.error(messageFrom(err));
     }
   };
+
+  const handleReviewPayment = async (bookingId: string, approve: boolean) => {
+    const action = approve ? "approve" : "reject";
+    if (!window.confirm(`Are you sure you want to ${action} this UPI payment?`)) return;
+    try {
+      const result = await reviewUpiPaymentFn({ data: { bookingId, approve } });
+      if (!result.success) throw new Error(result.error || "Payment review failed");
+      toast.success(approve ? "Payment approved and booking confirmed" : "Payment rejected");
+      await refreshAdminData();
+    } catch (error: unknown) {
+      toast.error(messageFrom(error));
+    }
+  };
+
+  if (authChecking) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-zinc-950 text-zinc-300">
+        Checking admin access…
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -256,7 +338,7 @@ function AdminPanel() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="bg-zinc-800/80 border-zinc-700 text-white"
-                    placeholder="admin@admin.com"
+                    placeholder="Admin email"
                     required
                   />
                 </div>
@@ -274,9 +356,10 @@ function AdminPanel() {
                 </div>
                 <Button
                   type="submit"
+                  disabled={isLoading}
                   className="w-full bg-[#00D084] hover:bg-[#00D084]/90 text-black font-semibold"
                 >
-                  Login
+                  {isLoading ? "Signing in…" : "Login"}
                 </Button>
               </form>
             </CardContent>
@@ -351,12 +434,17 @@ function AdminPanel() {
                           <TableHead className="text-zinc-400">User / Player</TableHead>
                           <TableHead className="text-zinc-400">Venue</TableHead>
                           <TableHead className="text-zinc-400">Date & Time</TableHead>
+                          <TableHead className="text-zinc-400">Duration</TableHead>
                           <TableHead className="text-zinc-400">Team Size</TableHead>
+                          <TableHead className="text-zinc-400">Payment</TableHead>
+                          <TableHead className="text-zinc-400">UPI UTR</TableHead>
+                          <TableHead className="text-zinc-400">Booking</TableHead>
                           <TableHead className="text-right text-zinc-400">Amount</TableHead>
+                          <TableHead className="text-right text-zinc-400">Review</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {bookings.map((booking: any) => (
+                        {bookings.map((booking) => (
                           <TableRow
                             key={booking.id}
                             className="border-zinc-800 hover:bg-zinc-800/50"
@@ -369,11 +457,73 @@ function AdminPanel() {
                               {booking.venues?.name || "Unknown"}
                             </TableCell>
                             <TableCell className="text-zinc-300">
-                              {booking.slots?.slot_date} {booking.slots?.start_time}
+                              <div className="space-y-1">
+                                {(
+                                  booking.booking_slots
+                                    ?.flatMap((linked) => (linked.slots ? [linked.slots] : []))
+                                    .sort(
+                                      (left, right) =>
+                                        left.slot_date.localeCompare(right.slot_date) ||
+                                        left.start_time.localeCompare(right.start_time),
+                                    ) ?? []
+                                ).map((slot) => (
+                                  <p
+                                    key={`${slot.slot_date}-${slot.start_time}-${slot.court_label}`}
+                                  >
+                                    {slot.slot_date} {slot.start_time.slice(0, 5)} ·{" "}
+                                    {slot.court_label}
+                                  </p>
+                                ))}
+                                {!booking.booking_slots?.length && booking.slots && (
+                                  <p>
+                                    {booking.slots.slot_date} {booking.slots.start_time.slice(0, 5)}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-zinc-300">
+                              {booking.duration_hours || 1} hr
+                              {(booking.duration_hours || 1) === 1 ? "" : "s"}
                             </TableCell>
                             <TableCell className="text-zinc-300">{booking.team_size}</TableCell>
+                            <TableCell
+                              className={
+                                booking.payment_status === "paid"
+                                  ? "font-semibold text-[#00D084]"
+                                  : "text-amber-400"
+                              }
+                            >
+                              {booking.payment_status || "unknown"}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-zinc-300">
+                              {booking.upi_transaction_id || "—"}
+                            </TableCell>
+                            <TableCell className="text-zinc-300">{booking.status}</TableCell>
                             <TableCell className="text-right text-[#00D084]">
                               ₹{booking.amount}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {booking.payment_status === "submitted" ? (
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    className="bg-[#00D084] text-black hover:bg-[#00D084]/90"
+                                    onClick={() => handleReviewPayment(booking.id, true)}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-red-500/60 text-red-300 hover:bg-red-950"
+                                    onClick={() => handleReviewPayment(booking.id, false)}
+                                  >
+                                    Reject
+                                  </Button>
+                                </div>
+                              ) : (
+                                <span className="text-zinc-600">—</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -439,7 +589,7 @@ function AdminPanel() {
                           min="0"
                           value={newVenue.price_per_hour}
                           onChange={(e) =>
-                            setNewVenue({ ...newVenue, price_per_hour: e.target.value as any })
+                            setNewVenue({ ...newVenue, price_per_hour: Number(e.target.value) })
                           }
                           className="bg-zinc-800 border-zinc-700 text-white"
                           placeholder="1500"
@@ -503,7 +653,7 @@ function AdminPanel() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {venues.map((venue: any) => (
+                          {venues.map((venue) => (
                             <TableRow
                               key={venue.id}
                               className="border-zinc-800 hover:bg-zinc-800/50"
@@ -568,7 +718,7 @@ function AdminPanel() {
                           <option value="" disabled>
                             Select Turf
                           </option>
-                          {venues.map((v: any) => (
+                          {venues.map((v) => (
                             <option key={v.id} value={v.id}>
                               {v.name}
                             </option>
@@ -676,12 +826,13 @@ function AdminPanel() {
                             <TableHead className="text-zinc-400">Date</TableHead>
                             <TableHead className="text-zinc-400">Time</TableHead>
                             <TableHead className="text-zinc-400">Court</TableHead>
+                            <TableHead className="text-zinc-400">Status</TableHead>
                             <TableHead className="text-right text-zinc-400">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {slots &&
-                            slots.map((slot: any) => (
+                            slots.map((slot) => (
                               <TableRow
                                 key={slot.id}
                                 className="border-zinc-800 hover:bg-zinc-800/50"
@@ -694,6 +845,17 @@ function AdminPanel() {
                                   {slot.start_time} ({slot.duration_minutes}m)
                                 </TableCell>
                                 <TableCell className="text-zinc-300">{slot.court_label}</TableCell>
+                                <TableCell
+                                  className={
+                                    slot.status === "available"
+                                      ? "text-[#00D084]"
+                                      : slot.status === "held"
+                                        ? "text-amber-400"
+                                        : "text-zinc-300"
+                                  }
+                                >
+                                  {slot.status}
+                                </TableCell>
                                 <TableCell className="text-right space-x-2">
                                   <Button
                                     variant="destructive"

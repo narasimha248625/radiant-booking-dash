@@ -22,3 +22,10 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Payment and admin configuration
+
+Copy `.env.example` to `.env` and configure the server-only Supabase secret key, the merchant
+UPI ID (`UPI_VPA`), and the permitted admin email address. Apply the Supabase migrations before
+accepting bookings. Customers can open PhonePe, Google Pay, Paytm, BHIM, or another UPI app and
+submit their UTR; the admin then approves or rejects that payment from `/admin`.

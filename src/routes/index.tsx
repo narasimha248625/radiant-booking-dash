@@ -17,6 +17,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowDown,
   ArrowRight,
@@ -43,7 +44,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand-logo";
 import { useTheme } from "@/hooks/use-theme";
-import { createBooking, getTurfData } from "@/lib/turf.functions";
+import {
+  cancelPaymentReservation,
+  createUpiPaymentRequest,
+  getUpiBookingStatus,
+  getTurfData,
+  submitUpiPaymentReference,
+} from "@/lib/turf.functions";
 import heroImage from "@/assets/turf-hero.jpg";
 import arenaImage from "@/assets/arena-aerial.jpg";
 import actionImage from "@/assets/match-action.jpg";
@@ -96,16 +103,74 @@ const imageMap = {
   action: actionImage,
 } as const;
 
-/* Load Razorpay SDK */
-const loadRazorpay = () => {
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
+type PaymentHistoryEntry = {
+  bookingId: string;
+  bookingCode: string;
+  paymentReference: string;
+  amount: number;
+  durationHours: number;
+  slotDate: string;
+  startTime: string;
+  bookingStatus: string;
+  paymentStatus: string;
 };
+
+const PAYMENT_HISTORY_KEY = "arena-stories-payment-history";
+const CUSTOMER_SESSION_KEY = "arena-stories-customer-session-id";
+const CUSTOMER_SESSION_COOKIE = "arena_stories_customer_session";
+
+function getCustomerSessionId() {
+  const isUuid = (value: string | undefined): value is string =>
+    !!value &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  const stored = sessionStorage.getItem(CUSTOMER_SESSION_KEY) ?? undefined;
+  const cookieValue = document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith(`${CUSTOMER_SESSION_COOKIE}=`))
+    ?.slice(CUSTOMER_SESSION_COOKIE.length + 1);
+  const sessionId = isUuid(stored)
+    ? stored
+    : isUuid(cookieValue)
+      ? cookieValue
+      : crypto.randomUUID();
+
+  sessionStorage.setItem(CUSTOMER_SESSION_KEY, sessionId);
+  const secureFlag = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${CUSTOMER_SESSION_COOKIE}=${encodeURIComponent(sessionId)}; Path=/; SameSite=Lax${secureFlag}`;
+  return sessionId;
+}
+
+function readPaymentHistory(): PaymentHistoryEntry[] {
+  try {
+    const stored: unknown = JSON.parse(sessionStorage.getItem(PAYMENT_HISTORY_KEY) ?? "[]");
+    if (!Array.isArray(stored)) return [];
+    return stored
+      .filter(
+        (entry): entry is PaymentHistoryEntry =>
+          entry != null &&
+          typeof entry === "object" &&
+          typeof entry.bookingId === "string" &&
+          typeof entry.bookingCode === "string" &&
+          typeof entry.paymentReference === "string" &&
+          typeof entry.amount === "number" &&
+          typeof entry.durationHours === "number" &&
+          typeof entry.slotDate === "string" &&
+          typeof entry.startTime === "string" &&
+          typeof entry.bookingStatus === "string" &&
+          typeof entry.paymentStatus === "string",
+      )
+      .slice(0, 10);
+  } catch {
+    return [];
+  }
+}
+
+function isSlotAvailable(slot: { status: string; reserved_count: number; capacity: number }) {
+  return (
+    (slot.status === "available" || slot.status === "limited") &&
+    slot.reserved_count < slot.capacity
+  );
+}
 
 /* ─────────────────────────────────────────────────────────
    Main component
@@ -113,7 +178,10 @@ const loadRazorpay = () => {
 function ArenaStories() {
   const { venues, slots } = Route.useLoaderData();
   const router = useRouter();
-  const submitBooking = useServerFn(createBooking);
+  const createUpiRequest = useServerFn(createUpiPaymentRequest);
+  const getUpiStatus = useServerFn(getUpiBookingStatus);
+  const submitUpiReference = useServerFn(submitUpiPaymentReference);
+  const cancelReservation = useServerFn(cancelPaymentReservation);
 
   /* ── UI state ── */
   const { isDark, toggleTheme } = useTheme();
@@ -128,24 +196,184 @@ function ArenaStories() {
   );
 
   /* Unique sorted dates for the selected venue */
-  const days = [...new Set(venueSlots.map((slot) => slot.slot_date))];
-  const [dayIndex, setDayIndex] = useState(0);
-  const activeDate = days[Math.min(dayIndex, Math.max(days.length - 1, 0))];
-  const activeSlots = venueSlots.filter((slot) => slot.slot_date === activeDate);
+  const days = [...new Set(venueSlots.map((slot) => slot.slot_date))].sort();
+  const [selectedDate, setSelectedDate] = useState("");
+  const activeDate = days.includes(selectedDate) ? selectedDate : (days[0] ?? "");
+  const dayIndex = days.indexOf(activeDate);
+  const visibleDates = days.slice(Math.max(0, dayIndex - 2), Math.min(days.length, dayIndex + 3));
+  const slotsForDate = venueSlots.filter((slot) => slot.slot_date === activeDate);
+  const hasMainCourt = slotsForDate.some((slot) => slot.court_label === "Main");
+  const activeSlots = slotsForDate
+    .filter((slot) => !hasMainCourt || slot.court_label === "Main")
+    .sort((left, right) => left.start_time.localeCompare(right.start_time));
 
   /* ── Booking form state ── */
   const [slotId, setSlotId] = useState("");
+  const [durationHours, setDurationHours] = useState(1);
   const [teamSize, setTeamSize] = useState(10);
   const [playerName, setPlayerName] = useState("");
   const [booking, setBooking] = useState<{
     booking_code: string;
     booking_status: string;
+    payment_status: string;
     total_amount: number;
   } | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryEntry[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [statusCheckError, setStatusCheckError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [upiTransactionId, setUpiTransactionId] = useState("");
+  const [upiPayment, setUpiPayment] = useState<{
+    bookingId: string;
+    bookingCode: string;
+    paymentReference: string;
+    upiUri: string;
+    amount: number;
+    durationHours: number;
+    slotDate: string;
+    startTime: string;
+    payeeName: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const history = readPaymentHistory();
+    setPaymentHistory(history);
+    const latest = history[0];
+    if (latest) {
+      setBooking({
+        booking_code: latest.bookingCode,
+        booking_status: latest.bookingStatus,
+        payment_status: latest.paymentStatus,
+        total_amount: latest.amount,
+      });
+    }
+    setHistoryLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!historyLoaded) return;
+    try {
+      sessionStorage.setItem(PAYMENT_HISTORY_KEY, JSON.stringify(paymentHistory.slice(0, 10)));
+    } catch {
+      setStatusCheckError("This browser could not save transaction history for this tab.");
+    }
+  }, [historyLoaded, paymentHistory]);
+
+  useEffect(() => {
+    const submittedPayments = paymentHistory.filter((entry) => entry.paymentStatus === "submitted");
+    if (!historyLoaded || submittedPayments.length === 0) return;
+
+    let active = true;
+    let checking = false;
+    const refreshStatuses = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const results = await Promise.all(
+          submittedPayments.map(async (entry) => {
+            try {
+              const status = await getUpiStatus({
+                data: {
+                  bookingId: entry.bookingId,
+                  paymentReference: entry.paymentReference,
+                },
+              });
+              return { entry, status };
+            } catch (error) {
+              return {
+                entry,
+                error: error instanceof Error ? error.message : "Could not refresh payment status.",
+              };
+            }
+          }),
+        );
+        if (!active) return;
+
+        let changedToConfirmed = false;
+        let failedStatusCheck = false;
+        const updatedHistory = paymentHistory.map((entry) => {
+          const result = results.find((item) => item.entry.bookingId === entry.bookingId);
+          if (!result || !("status" in result)) {
+            if (result) failedStatusCheck = true;
+            return entry;
+          }
+          const updated = {
+            ...entry,
+            bookingStatus: result.status.bookingStatus,
+            paymentStatus: result.status.paymentStatus,
+            amount: result.status.amount,
+          };
+          if (
+            entry.bookingStatus === updated.bookingStatus &&
+            entry.paymentStatus === updated.paymentStatus &&
+            entry.amount === updated.amount
+          ) {
+            return entry;
+          }
+          if (entry.paymentStatus !== updated.paymentStatus) {
+            if (updated.paymentStatus === "paid") changedToConfirmed = true;
+          }
+          return updated;
+        });
+
+        if (updatedHistory.some((entry, index) => entry !== paymentHistory[index])) {
+          setPaymentHistory(updatedHistory);
+        }
+        setStatusCheckError(
+          failedStatusCheck ? "Could not refresh approval status. Retrying automatically…" : "",
+        );
+        const latest = updatedHistory[0];
+        if (latest) {
+          setBooking({
+            booking_code: latest.bookingCode,
+            booking_status: latest.bookingStatus,
+            payment_status: latest.paymentStatus,
+            total_amount: latest.amount,
+          });
+        }
+        if (changedToConfirmed) await router.invalidate({ sync: true });
+      } catch {
+        if (active) {
+          setStatusCheckError("Could not refresh approval status. Retrying automatically…");
+        }
+      } finally {
+        checking = false;
+      }
+    };
+
+    void refreshStatuses();
+    const timer = window.setInterval(() => void refreshStatuses(), 5000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [getUpiStatus, historyLoaded, paymentHistory, router]);
 
   const chosenSlot = slots.find((slot) => slot.id === slotId);
+  const chosenSlotIndex = activeSlots.findIndex((slot) => slot.id === slotId);
+  const maxDuration = useMemo(() => {
+    if (chosenSlotIndex < 0) return 1;
+    let count = 0;
+    for (let index = chosenSlotIndex; index < activeSlots.length; index += 1) {
+      const slot = activeSlots[index]!;
+      const expectedHour =
+        (Number(activeSlots[chosenSlotIndex]!.start_time.slice(0, 2)) + count) % 24;
+      if (
+        count >= 3 ||
+        !isSlotAvailable(slot) ||
+        Number(slot.start_time.slice(0, 2)) !== expectedHour
+      ) {
+        break;
+      }
+      count += 1;
+    }
+    return Math.max(1, count);
+  }, [activeSlots, chosenSlotIndex]);
+  const selectedSlots =
+    chosenSlotIndex >= 0
+      ? activeSlots.slice(chosenSlotIndex, chosenSlotIndex + Math.min(durationHours, maxDuration))
+      : [];
 
   /* 4-step progress indicator (1 = venue, 2 = slot, 3 = details, 4 = confirmed) */
   const step = booking ? 4 : slotId ? 3 : venueId ? 2 : 1;
@@ -157,7 +385,54 @@ function ArenaStories() {
   const changeVenue = (id: string) => {
     setVenueId(id);
     setSlotId("");
-    setDayIndex(0);
+    setDurationHours(1);
+    setSelectedDate("");
+    setBooking(null);
+  };
+
+  const selectDate = (date: string) => {
+    if (!days.includes(date)) return;
+    setSelectedDate(date);
+    setSlotId("");
+    setDurationHours(1);
+    setError("");
+  };
+
+  const moveDate = (offset: number) => {
+    const date = days[dayIndex + offset];
+    if (date) selectDate(date);
+  };
+
+  /** Select a continuous range by tapping its first and last hour. */
+  const selectSlot = (slot: (typeof activeSlots)[number]) => {
+    const clickedIndex = activeSlots.findIndex((item) => item.id === slot.id);
+    if (clickedIndex < 0 || !isSlotAvailable(slot)) return;
+
+    if (chosenSlotIndex < 0) {
+      setSlotId(slot.id);
+      setDurationHours(1);
+    } else {
+      const startIndex = Math.min(chosenSlotIndex, clickedIndex);
+      const endIndex = Math.max(chosenSlotIndex, clickedIndex);
+      const range = activeSlots.slice(startIndex, endIndex + 1);
+      const isContinuous = range.every((item, index) => {
+        if (!isSlotAvailable(item)) return false;
+        if (index === 0) return true;
+        const previousHour = Number(range[index - 1]!.start_time.slice(0, 2));
+        const currentHour = Number(item.start_time.slice(0, 2));
+        return currentHour === previousHour + 1;
+      });
+
+      if (isContinuous) {
+        setSlotId(activeSlots[startIndex]!.id);
+        setDurationHours(Math.min(range.length, 3));
+      } else {
+        setSlotId(slot.id);
+        setDurationHours(1);
+      }
+    }
+
+    setError("");
     setBooking(null);
   };
 
@@ -178,63 +453,103 @@ function ArenaStories() {
 
   /* ── Booking submission ── */
   async function confirmBooking() {
-    if (!venue || !slotId || playerName.trim().length < 2) {
+    if (!venue || selectedSlots.length !== durationHours || playerName.trim().length < 2) {
       setError("Select a slot and enter the captain's name.");
       return;
     }
     setSubmitting(true);
     setError("");
-    
+
     try {
-      const isLoaded = await loadRazorpay();
-      if (!isLoaded) {
-        throw new Error("Razorpay SDK failed to load. Are you online?");
-      }
-
-      const options = {
-        key: "rzp_test_testkey", // Use a test key for demonstration
-        amount: venue.price_per_hour * 100, // Price in paise
-        currency: "INR",
-        name: "Arena Stories",
-        description: "Premium Box Cricket Booking",
-        handler: async function (response: any) {
-          try {
-            // Payment successful, confirm booking in our system
-            const result = await submitBooking({
-              data: { venueId: venue.id, slotId, playerName, teamSize },
-            });
-            setBooking(result);
-            /* Revalidate server data so slot status updates immediately */
-            await router.invalidate({ sync: true });
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "Booking failed after payment.");
-          } finally {
-            setSubmitting(false);
-          }
+      const payment = await createUpiRequest({
+        data: {
+          venueId: venue.id,
+          slots: selectedSlots.map((slot) => ({
+            id: slot.id,
+            slotDate: slot.slot_date,
+            startTime: slot.start_time,
+            courtLabel: slot.court_label,
+          })),
+          playerName,
+          teamSize,
+          customerSessionId: getCustomerSessionId(),
         },
-        prefill: {
-          name: playerName,
-        },
-        theme: {
-          color: "#16a34a",
-        },
-        modal: {
-          ondismiss: function () {
-            setSubmitting(false);
-          },
-        },
-      };
-
-      const paymentObject = new (window as any).Razorpay(options);
-      paymentObject.on("payment.failed", function (response: any) {
-        setError("Payment failed: " + response.error.description);
-        setSubmitting(false);
       });
-      
-      paymentObject.open();
-
+      if (!payment.success) {
+        setError(payment.error);
+        return;
+      }
+      setUpiPayment(payment);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Payment initialization failed.");
+      setError(err instanceof Error ? err.message : "UPI payment initialization failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitPaymentReference() {
+    if (!upiPayment || upiTransactionId.trim().length < 6) {
+      setError("Enter the UPI transaction ID shown in your payment app.");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const result = await submitUpiReference({
+        data: {
+          bookingId: upiPayment.bookingId,
+          paymentReference: upiPayment.paymentReference,
+          upiTransactionId,
+        },
+      });
+      const historyEntry: PaymentHistoryEntry = {
+        bookingId: upiPayment.bookingId,
+        bookingCode: result.booking_code,
+        paymentReference: upiPayment.paymentReference,
+        amount: result.total_amount,
+        durationHours: upiPayment.durationHours,
+        slotDate: upiPayment.slotDate,
+        startTime: upiPayment.startTime,
+        bookingStatus: "pending",
+        paymentStatus: "submitted",
+      };
+      setPaymentHistory((previous) =>
+        [
+          historyEntry,
+          ...previous.filter((entry) => entry.bookingId !== historyEntry.bookingId),
+        ].slice(0, 10),
+      );
+      setBooking({
+        booking_code: historyEntry.bookingCode,
+        booking_status: historyEntry.bookingStatus,
+        payment_status: historyEntry.paymentStatus,
+        total_amount: historyEntry.amount,
+      });
+      setUpiPayment(null);
+      await router.invalidate({ sync: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not submit the UPI payment.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function cancelUpiPayment() {
+    if (!upiPayment) return;
+    setSubmitting(true);
+    try {
+      await cancelReservation({
+        data: {
+          bookingId: upiPayment.bookingId,
+          paymentReference: upiPayment.paymentReference,
+        },
+      });
+      setUpiPayment(null);
+      setUpiTransactionId("");
+      await router.invalidate({ sync: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not cancel the payment hold.");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -485,11 +800,8 @@ function ArenaStories() {
                     variant="ghost"
                     className="border border-hero-foreground/20 text-hero-foreground hover:bg-hero-foreground hover:text-hero"
                     aria-label="Previous match day"
-                    disabled={dayIndex === 0}
-                    onClick={() => {
-                      setDayIndex((v) => Math.max(0, v - 1));
-                      setSlotId("");
-                    }}
+                    disabled={dayIndex <= 0}
+                    onClick={() => moveDate(-1)}
                   >
                     <ChevronLeft />
                   </Button>
@@ -498,11 +810,8 @@ function ArenaStories() {
                     variant="ghost"
                     className="border border-hero-foreground/20 text-hero-foreground hover:bg-hero-foreground hover:text-hero"
                     aria-label="Next match day"
-                    disabled={dayIndex >= days.length - 1}
-                    onClick={() => {
-                      setDayIndex((v) => Math.min(days.length - 1, v + 1));
-                      setSlotId("");
-                    }}
+                    disabled={dayIndex < 0 || dayIndex >= days.length - 1}
+                    onClick={() => moveDate(1)}
                   >
                     <ChevronRight />
                   </Button>
@@ -512,7 +821,7 @@ function ArenaStories() {
               {/* Quick slot preview (max 3) */}
               <div className="mt-4 grid grid-cols-3 gap-2">
                 {activeSlots
-                  .filter((slot) => slot.status !== "booked")
+                  .filter(isSlotAvailable)
                   .slice(0, 3)
                   .map((slot) => (
                     <Button
@@ -525,6 +834,7 @@ function ArenaStories() {
                       }`}
                       onClick={() => {
                         setSlotId(slot.id);
+                        setDurationHours(1);
                         setBooking(null);
                       }}
                     >
@@ -564,7 +874,9 @@ function ArenaStories() {
         <section id="pitches" className="px-5 py-20 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-7xl">
             <SectionTitle number="01" kicker="Pick your ground" title="BUILT FOR THE GAME." />
-            <div className={`mt-10 grid gap-5 ${venues.length === 1 ? 'max-w-2xl mx-auto' : 'lg:grid-cols-3'}`}>
+            <div
+              className={`mt-10 grid gap-5 ${venues.length === 1 ? "max-w-2xl mx-auto" : "lg:grid-cols-3"}`}
+            >
               {venues.map((item, index) => (
                 <article
                   key={item.id}
@@ -610,8 +922,10 @@ function ArenaStories() {
                       </p>
                       <p className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
                         <Phone className="h-4 w-4 shrink-0 text-primary" />
-                        <span className="text-primary">{item.contact_phone || '+91 70935 93568'}</span>{" "}
-                        <span className="font-normal">{item.contact_name || 'ruttala ashok'}</span>
+                        <span className="text-primary">
+                          {item.contact_phone || "+91 70935 93568"}
+                        </span>{" "}
+                        <span className="font-normal">{item.contact_name || "ruttala ashok"}</span>
                       </p>
                     </div>
 
@@ -720,7 +1034,7 @@ function ArenaStories() {
               <div className="min-w-0">
                 {/* Step progress bar */}
                 <div className="mb-7 grid grid-cols-4 gap-1">
-                  {["Pitch", "Slot", "Details", "Confirmed"].map((label, index) => (
+                  {["Pitch", "Slot", "Details", "Payment"].map((label, index) => (
                     <div key={label}>
                       <div
                         className={`h-1 transition-colors duration-300 ${index + 1 <= step ? "bg-primary" : "bg-muted"}`}
@@ -752,7 +1066,7 @@ function ArenaStories() {
                 <div className="mt-8 flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase text-muted-foreground">Select date</p>
-                    <h3 className="font-display text-4xl">
+                    <h3 className="mt-1 font-display text-4xl">
                       {activeDate ? formatDay(activeDate) : "No dates"}
                     </h3>
                   </div>
@@ -761,11 +1075,8 @@ function ArenaStories() {
                       size="icon"
                       variant="sportOutline"
                       aria-label="Previous day"
-                      disabled={dayIndex === 0}
-                      onClick={() => {
-                        setDayIndex((v) => Math.max(0, v - 1));
-                        setSlotId("");
-                      }}
+                      disabled={dayIndex <= 0}
+                      onClick={() => moveDate(-1)}
                     >
                       <ChevronLeft />
                     </Button>
@@ -773,41 +1084,110 @@ function ArenaStories() {
                       size="icon"
                       variant="sportOutline"
                       aria-label="Next day"
-                      disabled={dayIndex >= days.length - 1}
-                      onClick={() => {
-                        setDayIndex((v) => Math.min(days.length - 1, v + 1));
-                        setSlotId("");
-                      }}
+                      disabled={dayIndex < 0 || dayIndex >= days.length - 1}
+                      onClick={() => moveDate(1)}
                     >
                       <ChevronRight />
                     </Button>
                   </div>
                 </div>
 
+                {days.length > 0 && (
+                  <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                    {visibleDates.map((date) => (
+                      <Button
+                        key={date}
+                        type="button"
+                        variant={date === activeDate ? "sport" : "sportOutline"}
+                        aria-pressed={date === activeDate}
+                        aria-label={`Select ${formatDay(date)}`}
+                        className="h-12 px-2 text-[11px] sm:text-xs"
+                        onClick={() => selectDate(date)}
+                      >
+                        {formatDay(date)}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mt-5 text-sm font-semibold text-muted-foreground">
+                  Select a starting hour below. Then choose how many consecutive hours to book.
+                </p>
+
                 {/* Slot grid */}
                 <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {activeSlots.map((slot) => {
-                    const booked = slot.status === "booked";
-                    const selected = slot.id === slotId;
-                    return (
-                      <Button
-                        key={slot.id}
-                        variant={selected ? "sport" : "sportOutline"}
-                        disabled={booked}
-                        className="h-16 flex-col"
-                        onClick={() => {
-                          setSlotId(slot.id);
-                          setBooking(null);
-                        }}
-                      >
-                        <span>{formatTime(slot.start_time)}</span>
-                        <span className="text-[10px] normal-case opacity-65">
-                          {booked ? "Booked" : `Pitch ${slot.court_label}`}
-                        </span>
-                      </Button>
-                    );
-                  })}
+                  {activeSlots.length === 0 ? (
+                    <p className="col-span-full border border-dashed border-border p-4 text-sm text-muted-foreground">
+                      {activeDate
+                        ? "No hours are available for this date."
+                        : "No booking dates are currently available."}
+                    </p>
+                  ) : (
+                    activeSlots.map((slot) => {
+                      const available = isSlotAvailable(slot);
+                      const unavailable = !available;
+                      const selected = selectedSlots.some(
+                        (selectedSlot) => selectedSlot.id === slot.id,
+                      );
+                      return (
+                        <Button
+                          key={slot.id}
+                          type="button"
+                          variant={selected ? "sport" : "sportOutline"}
+                          disabled={unavailable}
+                          aria-pressed={selected}
+                          className={`h-16 flex-col ${selected ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                          onClick={() => selectSlot(slot)}
+                        >
+                          <span>{formatTime(slot.start_time)}</span>
+                          <span className="text-[10px] normal-case opacity-65">
+                            {slot.status === "booked" || slot.reserved_count >= slot.capacity
+                              ? "Booked"
+                              : slot.status === "held"
+                                ? "Booked — approval pending"
+                                : slot.status === "limited"
+                                  ? "Limited availability"
+                                  : selected
+                                    ? "Selected"
+                                    : "Available"}
+                          </span>
+                        </Button>
+                      );
+                    })
+                  )}
                 </div>
+
+                {chosenSlot && (
+                  <div className="mt-6 border border-border bg-card p-4">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                      <div>
+                        <label
+                          htmlFor="duration-hours"
+                          className="text-xs font-bold uppercase text-muted-foreground"
+                        >
+                          Booking duration
+                        </label>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Choose any consecutive hours from this start time.
+                        </p>
+                      </div>
+                      <select
+                        id="duration-hours"
+                        value={Math.min(durationHours, maxDuration)}
+                        onChange={(event) => setDurationHours(Number(event.target.value))}
+                        className="h-12 min-w-40 border border-input bg-background px-4 font-bold outline-hidden focus:border-primary"
+                      >
+                        {Array.from({ length: maxDuration }, (_, index) => index + 1).map(
+                          (hours) => (
+                            <option key={hours} value={hours}>
+                              {hours} hour{hours === 1 ? "" : "s"} — ₹{hours * venue.price_per_hour}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 {/* Booking details */}
                 <div className="mt-8 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -824,6 +1204,8 @@ function ArenaStories() {
                       value={playerName}
                       onChange={(e) => setPlayerName(e.target.value)}
                       placeholder="Your full name"
+                      minLength={2}
+                      required
                       className="mt-2 h-12 w-full border border-input bg-background px-4 outline-hidden placeholder:text-muted-foreground focus:border-primary"
                     />
                   </div>
@@ -890,19 +1272,41 @@ function ArenaStories() {
                         />
                       ))}
                     </div>
-                    <p className="mt-5 text-xs font-bold uppercase text-status-success">
-                      Booking confirmed
+                    <p
+                      className={`mt-5 text-xs font-bold uppercase ${
+                        booking.payment_status === "paid"
+                          ? "text-status-success"
+                          : booking.payment_status === "failed"
+                            ? "text-status-danger"
+                            : "text-amber-500"
+                      }`}
+                    >
+                      {booking.payment_status === "paid"
+                        ? "Payment approved"
+                        : booking.payment_status === "failed"
+                          ? "Payment rejected"
+                          : "Payment submitted"}
                     </p>
-                    <h3 className="mt-2 font-display text-5xl">YOU'RE IN.</h3>
+                    <h3 className="mt-2 font-display text-5xl">
+                      {booking.payment_status === "paid"
+                        ? "MATCH CONFIRMED."
+                        : booking.payment_status === "failed"
+                          ? "NOT APPROVED."
+                          : "UNDER REVIEW."}
+                    </h3>
                     <p className="mt-3 text-muted-foreground">
-                      Show this code when you arrive at the pitch.
+                      {booking.payment_status === "paid"
+                        ? "Your payment is approved and your selected slot is booked."
+                        : booking.payment_status === "failed"
+                          ? "The payment was rejected and the slot has been released."
+                          : "Your UTR was received. Approval is pending; this page will update automatically."}
                     </p>
                     {/* Booking code — styled prominently */}
                     <p className="mt-6 border-y border-border py-5 font-display text-4xl tracking-widest text-primary">
                       {booking.booking_code}
                     </p>
                     <p className="mt-3 text-sm text-muted-foreground">
-                      Total paid: <strong>₹{booking.total_amount}</strong>
+                      Amount submitted: <strong>₹{booking.total_amount}</strong>
                     </p>
                     <Button
                       className="mt-6 w-full"
@@ -910,11 +1314,78 @@ function ArenaStories() {
                       onClick={() => {
                         setBooking(null);
                         setSlotId("");
+                        setDurationHours(1);
                         setPlayerName("");
                       }}
                     >
                       Book another match
                     </Button>
+                  </div>
+                ) : upiPayment ? (
+                  <div>
+                    <p className="text-xs font-bold uppercase text-primary">Pay with any UPI app</p>
+                    <h3 className="mt-2 font-display text-4xl">₹{upiPayment.amount}</h3>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Works with PhonePe, Google Pay, Paytm, BHIM, and other Indian UPI apps.
+                    </p>
+                    <div className="mt-6 flex flex-col items-center border border-border bg-white p-4 text-center text-black">
+                      <QRCodeSVG
+                        value={upiPayment.upiUri}
+                        size={220}
+                        level="M"
+                        marginSize={2}
+                        title={`Pay ₹${upiPayment.amount} to ${upiPayment.payeeName}`}
+                      />
+                      <p className="mt-3 text-sm font-bold">Scan with any UPI app</p>
+                      <p className="mt-1 text-xs text-black/60">
+                        The amount and booking reference are included automatically.
+                      </p>
+                    </div>
+                    <Button
+                      size="lg"
+                      variant="sport"
+                      className="as-glow mt-6 w-full"
+                      onClick={() => {
+                        window.location.href = upiPayment.upiUri;
+                      }}
+                    >
+                      Open UPI app <ArrowRight />
+                    </Button>
+                    <div className="mt-6 border-t border-border pt-5">
+                      <label
+                        htmlFor="upi-transaction-id"
+                        className="text-xs font-bold uppercase text-muted-foreground"
+                      >
+                        UPI transaction ID / UTR
+                      </label>
+                      <input
+                        id="upi-transaction-id"
+                        value={upiTransactionId}
+                        onChange={(event) => setUpiTransactionId(event.target.value.trim())}
+                        placeholder="Enter after completing payment"
+                        className="mt-2 h-12 w-full border border-input bg-background px-4 outline-hidden focus:border-primary"
+                      />
+                      <Button
+                        size="lg"
+                        variant="sport"
+                        className="mt-3 w-full"
+                        disabled={submitting || upiTransactionId.trim().length < 6}
+                        onClick={submitPaymentReference}
+                      >
+                        {submitting ? "Submitting…" : "I have paid — submit UTR"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="mt-2 w-full"
+                        disabled={submitting}
+                        onClick={cancelUpiPayment}
+                      >
+                        Cancel payment
+                      </Button>
+                    </div>
+                    <p className="mt-4 text-center text-xs text-muted-foreground">
+                      Booking code: {upiPayment.bookingCode} · Slot held for 20 minutes
+                    </p>
                   </div>
                 ) : (
                   /* ── Booking summary state ── */
@@ -935,7 +1406,7 @@ function ArenaStories() {
                         label="Kick-off"
                         value={
                           chosenSlot
-                            ? `${formatTime(chosenSlot.start_time)} · ${chosenSlot.duration_minutes} min`
+                            ? `${formatTime(chosenSlot.start_time)} · ${durationHours} hour${durationHours === 1 ? "" : "s"}`
                             : "Select a slot"
                         }
                       />
@@ -945,10 +1416,7 @@ function ArenaStories() {
                     <div className="flex items-end justify-between py-6">
                       <span className="text-sm text-muted-foreground">Total</span>
                       <span className="font-display text-5xl">
-                        ₹
-                        {chosenSlot
-                          ? venue.price_per_hour * (chosenSlot.duration_minutes / 60)
-                          : venue.price_per_hour}
+                        ₹{chosenSlot ? venue.price_per_hour * durationHours : venue.price_per_hour}
                       </span>
                     </div>
 
@@ -956,17 +1424,79 @@ function ArenaStories() {
                       size="lg"
                       variant="sport"
                       className="as-glow w-full"
-                      disabled={submitting || !slotId}
+                      disabled={submitting || !slotId || playerName.trim().length < 2}
                       onClick={confirmBooking}
                     >
-                      {submitting ? "Securing slot…" : "Confirm match"} <ArrowRight />
+                      {submitting
+                        ? "Opening secure payment…"
+                        : !slotId
+                          ? "Select a time slot"
+                          : playerName.trim().length < 2
+                            ? "Enter captain's name"
+                            : `Pay ₹${venue.price_per_hour * durationHours}`}{" "}
+                      <ArrowRight />
                     </Button>
+
+                    {(!slotId || playerName.trim().length < 2) && (
+                      <p className="mt-3 text-center text-xs text-muted-foreground">
+                        Select a slot and enter the captain&apos;s name to continue to payment.
+                      </p>
+                    )}
 
                     <p className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                       <ShieldCheck className="h-4 w-4" />
-                      Live availability secured at confirmation
+                      Pay with PhonePe, Google Pay, Paytm, BHIM, or any UPI app
                     </p>
                   </>
+                )}
+
+                {paymentHistory.length > 0 && (
+                  <div className="mt-6 border-t border-border pt-5">
+                    <h4 className="text-xs font-bold uppercase text-muted-foreground">
+                      Recent transaction history
+                    </h4>
+                    <div className="mt-3 space-y-3">
+                      {paymentHistory.map((entry) => (
+                        <div
+                          key={entry.bookingId}
+                          className="border border-border bg-background/60 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-mono text-sm font-bold">{entry.bookingCode}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {formatDay(entry.slotDate)} · {formatTime(entry.startTime)} ·{" "}
+                                {entry.durationHours} hour{entry.durationHours === 1 ? "" : "s"}
+                              </p>
+                            </div>
+                            <strong className="text-sm">₹{entry.amount}</strong>
+                          </div>
+                          <p
+                            className={`mt-2 text-xs font-semibold ${
+                              entry.paymentStatus === "paid"
+                                ? "text-status-success"
+                                : entry.paymentStatus === "submitted"
+                                  ? "text-amber-500"
+                                  : "text-status-danger"
+                            }`}
+                          >
+                            {entry.paymentStatus === "paid"
+                              ? "Approved — slot booked"
+                              : entry.paymentStatus === "submitted"
+                                ? "Approval pending"
+                                : entry.paymentStatus === "failed"
+                                  ? "Rejected — slot released"
+                                  : entry.paymentStatus}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {statusCheckError && (
+                      <p role="status" className="mt-3 text-xs text-amber-500">
+                        {statusCheckError}
+                      </p>
+                    )}
+                  </div>
                 )}
               </aside>
             </div>

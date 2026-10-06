@@ -7,6 +7,39 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  vite: {
+    optimizeDeps: {
+      // Pre-bundle the hydration-critical modules before the first browser request.
+      // Lazy optimization was changing the cache hash after HTML was served,
+      // leaving the page visible but without working React event handlers.
+      include: [
+        "react",
+        "react-dom/client",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "@tanstack/react-query",
+        "@tanstack/router-core",
+        "@tanstack/router-core/isServer",
+        "@tanstack/router-core/ssr/client",
+        "@radix-ui/react-slot",
+        "class-variance-authority",
+        "clsx",
+        "seroval",
+        "tailwind-merge",
+      ],
+    },
+    server: {
+      watch: {
+        // Local browser automation profiles contain files that change constantly.
+        // Watching them causes full-page reloads that reset booking selections.
+        ignored: [
+          "**/.chrome-test-profile/**",
+          "**/.edge-test-profile/**",
+          "**/.browser-check-profile*/**",
+        ],
+      },
+    },
+  },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

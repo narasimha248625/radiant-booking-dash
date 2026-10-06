@@ -20,6 +20,11 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Local browser automation profiles
+.chrome-test-profile/
+.edge-test-profile/
+.browser-check-profile*/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

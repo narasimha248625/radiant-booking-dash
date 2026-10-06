@@ -5,16 +5,13 @@ export type Theme = "light" | "dark";
 export const THEME_STORAGE_KEY = "theme";
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(THEME_STORAGE_KEY);
-      if (saved === "dark" || saved === "light") {
-        return saved;
-      }
-    }
-    // Default initial mode is light (white color)
-    return "light";
-  });
+  // Keep the first browser render identical to SSR, then restore the saved theme.
+  const [theme, setThemeState] = useState<Theme>("light");
+
+  useEffect(() => {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    if (saved === "dark" || saved === "light") setThemeState(saved);
+  }, []);
 
   useEffect(() => {
     // Ensure documentElement has or doesn't have .dark class

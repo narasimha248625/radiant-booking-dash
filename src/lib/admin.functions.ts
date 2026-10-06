@@ -1,43 +1,57 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireAdminAuth } from "@/integrations/supabase/auth-middleware";
 
-export const getAdminData = createServerFn({ method: "GET" }).handler(async () => {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unexpected server error";
+}
 
-    // Fetch venues
-    const { data: venues, error: venuesError } = await supabaseAdmin
-      .from("venues")
-      .select("*")
-      .order("created_at", { ascending: false });
+export const getAdminData = createServerFn({ method: "GET" })
+  .middleware([requireAdminAuth])
+  .handler(async () => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Fetch bookings with their venues and slots
-    // Note: guest bookings use the 'bookings' table
-    const { data: bookings, error: bookingsError } = await supabaseAdmin
-      .from("bookings")
-      .select("*, venues(name), slots(slot_date, start_time)")
-      .order("created_at", { ascending: false });
+      // Fetch venues
+      const { data: venues, error: venuesError } = await supabaseAdmin
+        .from("venues")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    const { data: slots, error: slotsError } = await supabaseAdmin
-      .from("slots")
-      .select("*, venues(name)")
-      .order("slot_date", { ascending: false })
-      .order("start_time", { ascending: true });
+      // Fetch bookings with their venues and slots
+      // Note: guest bookings use the 'bookings' table
+      const { data: bookings, error: bookingsError } = await supabaseAdmin
+        .from("bookings")
+        .select(
+          "*, venues(name), slots(slot_date, start_time, duration_minutes), booking_slots(slots(slot_date, start_time, duration_minutes, court_label))",
+        )
+        .order("created_at", { ascending: false });
 
-    return {
-      venues: venues || [],
-      bookings: bookings || [],
-      slots: slots || [],
-    };
-  } catch (err) {
-    console.error("[getAdminData] Failed to fetch admin data:", err);
-    return {
-      venues: [],
-      bookings: [],
-      slots: [],
-    };
-  }
-});
+      const { data: slots, error: slotsError } = await supabaseAdmin
+        .from("slots")
+        .select("*, venues(name)")
+        .order("slot_date", { ascending: false })
+        .order("start_time", { ascending: true });
+
+      if (venuesError || bookingsError || slotsError) {
+        throw new Error(
+          venuesError?.message ||
+            bookingsError?.message ||
+            slotsError?.message ||
+            "Admin data failed",
+        );
+      }
+
+      return {
+        venues: venues || [],
+        bookings: bookings || [],
+        slots: slots || [],
+      };
+    } catch (err) {
+      console.error("[getAdminData] Failed to fetch admin data:", err);
+      throw err;
+    }
+  });
 
 const addVenueSchema = z.object({
   name: z.string().min(2),
@@ -47,6 +61,7 @@ const addVenueSchema = z.object({
 });
 
 export const addVenueAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAuth])
   .validator((input) => addVenueSchema.parse(input))
   .handler(async ({ data }) => {
     try {
@@ -68,9 +83,9 @@ export const addVenueAdmin = createServerFn({ method: "POST" })
 
       if (error) throw new Error(error.message);
       return { success: true, venue };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[addVenueAdmin] Failed to add venue:", err);
-      return { success: false, error: err.message };
+      return { success: false, error: errorMessage(err) };
     }
   });
 
@@ -79,6 +94,7 @@ const removeVenueSchema = z.object({
 });
 
 export const removeVenueAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAuth])
   .validator((input) => removeVenueSchema.parse(input))
   .handler(async ({ data }) => {
     try {
@@ -96,9 +112,9 @@ export const removeVenueAdmin = createServerFn({ method: "POST" })
         );
       }
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[removeVenueAdmin] Failed to remove venue:", err);
-      return { success: false, error: err.message };
+      return { success: false, error: errorMessage(err) };
     }
   });
 
@@ -111,6 +127,7 @@ const updateVenueSchema = z.object({
 });
 
 export const updateVenueAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAuth])
   .validator((input) => updateVenueSchema.parse(input))
   .handler(async ({ data }) => {
     try {
@@ -120,9 +137,9 @@ export const updateVenueAdmin = createServerFn({ method: "POST" })
 
       if (error) throw new Error(error.message);
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[updateVenueAdmin] Failed to update venue:", err);
-      return { success: false, error: err.message };
+      return { success: false, error: errorMessage(err) };
     }
   });
 
@@ -136,6 +153,7 @@ const addSlotSchema = z.object({
 });
 
 export const addSlotAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAuth])
   .validator((input) => addSlotSchema.parse(input))
   .handler(async ({ data }) => {
     try {
@@ -154,9 +172,9 @@ export const addSlotAdmin = createServerFn({ method: "POST" })
 
       if (error) throw new Error(error.message);
       return { success: true, slot };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[addSlotAdmin] Failed to add slot:", err);
-      return { success: false, error: err.message };
+      return { success: false, error: errorMessage(err) };
     }
   });
 
@@ -165,6 +183,7 @@ const removeSlotSchema = z.object({
 });
 
 export const removeSlotAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAuth])
   .validator((input) => removeSlotSchema.parse(input))
   .handler(async ({ data }) => {
     try {
@@ -173,8 +192,31 @@ export const removeSlotAdmin = createServerFn({ method: "POST" })
 
       if (error) throw new Error(error.message);
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[removeSlotAdmin] Failed to remove slot:", err);
-      return { success: false, error: err.message };
+      return { success: false, error: errorMessage(err) };
+    }
+  });
+
+const reviewUpiPaymentSchema = z.object({
+  bookingId: z.string().uuid(),
+  approve: z.boolean(),
+});
+
+export const reviewUpiPaymentAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAuth])
+  .validator((input) => reviewUpiPaymentSchema.parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin.rpc("review_upi_payment", {
+        p_booking_id: data.bookingId,
+        p_approve: data.approve,
+      });
+      if (error) throw new Error(error.message);
+      return { success: true };
+    } catch (error: unknown) {
+      console.error("[reviewUpiPaymentAdmin] Failed to review payment:", error);
+      return { success: false, error: errorMessage(error) };
     }
   });

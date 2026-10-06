@@ -13,8 +13,14 @@ export type Database = {
           amount: number;
           booking_code: string;
           created_at: string;
+          customer_session_id: string | null;
           id: string;
+          duration_hours: number;
+          hold_expires_at: string | null;
+          payment_status: string;
           player_name: string;
+          payment_reference: string | null;
+          upi_transaction_id: string | null;
           slot_id: string;
           status: string;
           team_size: number;
@@ -25,8 +31,14 @@ export type Database = {
           amount: number;
           booking_code: string;
           created_at?: string;
+          customer_session_id?: string | null;
           id?: string;
+          duration_hours?: number;
+          hold_expires_at?: string | null;
+          payment_status?: string;
           player_name: string;
+          payment_reference?: string | null;
+          upi_transaction_id?: string | null;
           slot_id: string;
           status?: string;
           team_size: number;
@@ -37,8 +49,14 @@ export type Database = {
           amount?: number;
           booking_code?: string;
           created_at?: string;
+          customer_session_id?: string | null;
           id?: string;
+          duration_hours?: number;
+          hold_expires_at?: string | null;
+          payment_status?: string;
           player_name?: string;
+          payment_reference?: string | null;
+          upi_transaction_id?: string | null;
           slot_id?: string;
           status?: string;
           team_size?: number;
@@ -58,6 +76,36 @@ export type Database = {
             columns: ["venue_id"];
             isOneToOne: false;
             referencedRelation: "venues";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      booking_slots: {
+        Row: {
+          booking_id: string;
+          slot_id: string;
+        };
+        Insert: {
+          booking_id: string;
+          slot_id: string;
+        };
+        Update: {
+          booking_id?: string;
+          slot_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "booking_slots_booking_id_fkey";
+            columns: ["booking_id"];
+            isOneToOne: false;
+            referencedRelation: "bookings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "booking_slots_slot_id_fkey";
+            columns: ["slot_id"];
+            isOneToOne: false;
+            referencedRelation: "slots";
             referencedColumns: ["id"];
           },
         ];
@@ -168,6 +216,55 @@ export type Database = {
           p_slot_id: string;
           p_team_size: number;
           p_venue_id: string;
+        };
+        Returns: {
+          booking_code: string;
+          booking_status: string;
+          total_amount: number;
+        }[];
+      };
+      cancel_booking_reservation: {
+        Args: {
+          p_booking_id: string;
+          p_payment_reference: string;
+        };
+        Returns: undefined;
+      };
+      ensure_hourly_slots: {
+        Args: { p_days?: number };
+        Returns: undefined;
+      };
+      release_expired_booking_holds: {
+        Args: Record<PropertyKey, never>;
+        Returns: undefined;
+      };
+      reserve_booking_slots: {
+        Args: {
+          p_player_name: string;
+          p_payment_reference: string;
+          p_customer_session_id: string;
+          p_slot_ids: string[];
+          p_team_size: number;
+          p_venue_id: string;
+        };
+        Returns: {
+          booking_code: string;
+          booking_id: string;
+          total_amount: number;
+        }[];
+      };
+      review_upi_payment: {
+        Args: {
+          p_approve: boolean;
+          p_booking_id: string;
+        };
+        Returns: undefined;
+      };
+      submit_upi_payment: {
+        Args: {
+          p_booking_id: string;
+          p_payment_reference: string;
+          p_upi_transaction_id: string;
         };
         Returns: {
           booking_code: string;
