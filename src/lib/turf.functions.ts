@@ -31,7 +31,10 @@ const paymentSubmissionSchema = z.object({
   upiTransactionId: z
     .string()
     .trim()
-    .regex(/^[A-Za-z0-9-]{6,35}$/),
+    .transform((value) => value.replace(/\s+/g, ""))
+    .refine((value) => /^\d{12}$/.test(value), {
+      message: "Enter the 12-digit UPI reference number shown in your payment app.",
+    }),
 });
 
 const cancelReservationSchema = z.object({
@@ -227,7 +230,7 @@ export const createUpiPaymentRequest = createServerFn({
 
       let { data: selectedSlots, error: slotError } = await supabaseAdmin
         .from("slots")
-        .select("id, venue_id, status, capacity, reserved_count")
+        .select("id, venue_id, slot_date, start_time, status, capacity, reserved_count")
         .in("id", requestedIds);
 
       // A page opened before hourly rows were generated
@@ -244,7 +247,7 @@ export const createUpiPaymentRequest = createServerFn({
         if (dates.length === 1 && courts.length === 1) {
           const resolved = await supabaseAdmin
             .from("slots")
-            .select("id, venue_id, status, capacity, reserved_count")
+            .select("id, venue_id, slot_date, start_time, status, capacity, reserved_count")
             .eq("venue_id", data.venueId)
             .eq("slot_date", dates[0]!)
             .eq("court_label", courts[0]!)
@@ -263,6 +266,14 @@ export const createUpiPaymentRequest = createServerFn({
         selectedSlots.some((slot) => slot.venue_id !== data.venueId || !isSlotAvailable(slot))
       ) {
         throw new Error("One or more selected hours are no longer available.");
+      }
+
+      if (
+        selectedSlots.some(
+          (slot) => new Date(`${slot.slot_date}T${slot.start_time}+05:30`).getTime() <= Date.now(),
+        )
+      ) {
+        throw new Error("The selected hour has already started. Choose a future slot.");
       }
 
       const slotIds = selectedSlots.map((slot) => slot.id);
@@ -347,6 +358,8 @@ export const createUpiPaymentRequest = createServerFn({
         startTime: data.slots[0]!.startTime,
 
         payeeName,
+
+        upiVpa: vpa,
       };
     } catch (error) {
       console.error("[createUpiPaymentRequest] Failed to prepare booking:", error);
@@ -406,6 +419,12 @@ export const submitUpiPaymentReference = createServerFn({
 
       p_upi_transaction_id: data.upiTransactionId,
     });
+
+    if (error?.code === "23505" && error.message.includes("bookings_upi_transaction_id_key")) {
+      throw new Error(
+        "This UPI transaction ID was already submitted for another booking. Enter the unique UTR for this payment, or contact the arena with your booking code.",
+      );
+    }
 
     if (error || !submitted?.[0]) {
       throw new Error(error?.message || "Could not submit the UPI payment reference.");

@@ -18,12 +18,11 @@ export const getAdminData = createServerFn({ method: "GET" })
         .select("*")
         .order("created_at", { ascending: false });
 
-      // Fetch bookings with their venues and slots
-      // Note: guest bookings use the 'bookings' table
+      // Bookings reach slots both directly and through booking_slots, so name each foreign key.
       const { data: bookings, error: bookingsError } = await supabaseAdmin
         .from("bookings")
         .select(
-          "*, venues(name), slots(slot_date, start_time, duration_minutes), booking_slots(slots(slot_date, start_time, duration_minutes, court_label))",
+          "*, venues!bookings_venue_id_fkey(name), slots!bookings_slot_id_fkey(slot_date, start_time, duration_minutes), booking_slots!booking_slots_booking_id_fkey(slots!booking_slots_slot_id_fkey(slot_date, start_time, duration_minutes, court_label))",
         )
         .order("created_at", { ascending: false });
 

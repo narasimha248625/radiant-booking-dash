@@ -18,6 +18,7 @@ import { useMemo, useState, useEffect } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowRight,
@@ -190,9 +191,19 @@ function ArenaStories() {
   /* ── Venue + slot selection state ── */
   const [venueId, setVenueId] = useState(venues[0]?.id ?? "");
   const venue = venues.find((item) => item.id === venueId) ?? venues[0];
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const venueSlots = useMemo(
-    () => slots.filter((slot) => slot.venue_id === venueId),
-    [slots, venueId],
+    () =>
+      slots.filter(
+        (slot) =>
+          slot.venue_id === venueId &&
+          new Date(`${slot.slot_date}T${slot.start_time}+05:30`).getTime() > currentTime,
+      ),
+    [slots, venueId, currentTime],
   );
 
   /* Unique sorted dates for the selected venue */
@@ -234,6 +245,7 @@ function ArenaStories() {
     slotDate: string;
     startTime: string;
     payeeName: string;
+    upiVpa: string;
   } | null>(null);
 
   useEffect(() => {
@@ -488,8 +500,12 @@ function ArenaStories() {
   }
 
   async function submitPaymentReference() {
-    if (!upiPayment || upiTransactionId.trim().length < 6) {
-      setError("Enter the UPI transaction ID shown in your payment app.");
+    if (!upiPayment) return;
+    const reference = upiTransactionId.replace(/\s+/g, "");
+    if (!/^\d{12}$/.test(reference)) {
+      const message = "Enter the 12-digit UPI reference number shown in your payment app.";
+      setError(message);
+      toast.error(message);
       return;
     }
     setSubmitting(true);
@@ -499,7 +515,7 @@ function ArenaStories() {
         data: {
           bookingId: upiPayment.bookingId,
           paymentReference: upiPayment.paymentReference,
-          upiTransactionId,
+          upiTransactionId: reference,
         },
       });
       const historyEntry: PaymentHistoryEntry = {
@@ -528,7 +544,17 @@ function ArenaStories() {
       setUpiPayment(null);
       await router.invalidate({ sync: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit the UPI payment.");
+      const detail = err instanceof Error ? err.message : "";
+      const message =
+        detail.includes("bookings_upi_transaction_id_key") || detail.includes("already submitted")
+          ? "This UPI reference number was already used for another booking. Check your payment app or contact the arena with your booking code."
+          : detail.includes("expired")
+            ? "This reservation has expired. If you paid, contact the arena with your booking code and UPI reference number."
+            : detail.includes("UPI reference number") || detail.includes("upiTransactionId")
+              ? "Enter the 12-digit UPI reference number shown in your payment app."
+              : "Could not submit your payment reference. Please try again or contact the arena with your booking code.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -1334,42 +1360,39 @@ function ArenaStories() {
                         size={220}
                         level="M"
                         marginSize={2}
-                        title={`Pay ₹${upiPayment.amount} to ${upiPayment.payeeName}`}
+                        title={`Pay ₹${upiPayment.amount} to ${upiPayment.payeeName} (${upiPayment.upiVpa})`}
                       />
                       <p className="mt-3 text-sm font-bold">Scan with any UPI app</p>
+                      <p className="mt-1 text-sm font-medium">UPI ID: {upiPayment.upiVpa}</p>
                       <p className="mt-1 text-xs text-black/60">
                         The amount and booking reference are included automatically.
                       </p>
                     </div>
-                    <Button
-                      size="lg"
-                      variant="sport"
-                      className="as-glow mt-6 w-full"
-                      onClick={() => {
-                        window.location.href = upiPayment.upiUri;
-                      }}
-                    >
-                      Open UPI app <ArrowRight />
-                    </Button>
                     <div className="mt-6 border-t border-border pt-5">
                       <label
                         htmlFor="upi-transaction-id"
                         className="text-xs font-bold uppercase text-muted-foreground"
                       >
-                        UPI transaction ID / UTR
+                        UPI reference number / UTR
                       </label>
                       <input
                         id="upi-transaction-id"
                         value={upiTransactionId}
-                        onChange={(event) => setUpiTransactionId(event.target.value.trim())}
-                        placeholder="Enter after completing payment"
+                        onChange={(event) => setUpiTransactionId(event.target.value)}
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="12 digits from your payment app"
                         className="mt-2 h-12 w-full border border-input bg-background px-4 outline-hidden focus:border-primary"
                       />
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Enter the 12-digit UPI reference number for this payment. Spaces are
+                        ignored. A reference can be submitted only once.
+                      </p>
                       <Button
                         size="lg"
                         variant="sport"
                         className="mt-3 w-full"
-                        disabled={submitting || upiTransactionId.trim().length < 6}
+                        disabled={submitting || !upiTransactionId.trim()}
                         onClick={submitPaymentReference}
                       >
                         {submitting ? "Submitting…" : "I have paid — submit UTR"}

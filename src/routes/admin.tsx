@@ -122,6 +122,20 @@ function AdminPanel() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    const refresh = () => {
+      void refreshAdminData().catch((error) =>
+        console.error("[admin] Could not refresh dashboard data:", error),
+      );
+    };
+
+    // Private booking rows do not produce readable Realtime events for the
+    // browser. Poll so newly submitted payments appear without a page reload.
+    const timer = window.setInterval(refresh, 10_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
     const channel = supabase
       .channel("admin-bookings")
       .on(
@@ -142,6 +156,8 @@ function AdminPanel() {
       .subscribe();
 
     return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
       supabase.removeChannel(channel);
     };
   }, [isAuthenticated, refreshAdminData]);

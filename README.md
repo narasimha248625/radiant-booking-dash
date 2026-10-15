@@ -1,54 +1,46 @@
-# Premium Booking Hub
+# Arena Stories booking
 
-these are some of the pintrest reference images so i want fully functional web and mobile responsive of a terf websit it should be fully premium of both bright and dark mode so here i want the booking status and booking slots and booking progress all the things i want fully scrolling animate website implement the things and give me end to end implementation
+TanStack Start booking site with hourly turf availability, UPI QR payments, and an admin review dashboard. The `main` branch is connected to Lovable. Keep pushed history intact; use normal commits and pushes.
 
-This project was built with [Lovable](https://lovable.dev).
+## Local development
 
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/e731b594-86d3-4b9f-b746-334951f33806).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Use Node.js 20 or newer. Copy `.env.example` to `.env`, then replace both publishable-key placeholders and the service-role-key placeholder with keys from Supabase project `amtictuisshyiaabhkky`. Keep `.env` private.
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm ci
 npm run dev
 ```
 
-## Payment and admin configuration
+Open `http://localhost:8080/` for booking and `http://localhost:8080/admin` for administration. The admin account must exist in Supabase Auth and its email must be listed in `ADMIN_EMAILS`.
 
-Copy `.env.example` to `.env` and configure the server-only Supabase secret key, the merchant
-UPI ID (`UPI_VPA`), and the permitted admin email address. Apply the Supabase migrations before
-accepting bookings. Customers can open PhonePe, Google Pay, Paytm, BHIM, or another UPI app and
-submit their UTR; the admin then approves or rejects that payment from `/admin`.
+## Deploy from GitHub to Vercel
 
-## Deploy to Vercel
+1. Import `narasimha248625/radiant-booking-dash` into Vercel and select `main` as the production branch.
+2. Confirm the framework preset is **TanStack Start**. The committed `vercel.json` selects it. Keep the detected build command and output settings.
+3. Add the environment variables below to **Production** in Vercel Project Settings → Environment Variables. Add them to Preview too if preview deployments should use the same Supabase project.
+4. Deploy. New pushes to `main` will build and deploy through the Git integration.
 
-Import this repository in Vercel with the `main` branch. The committed `vercel.json`
-selects TanStack Start; keep the detected build command (`npm run build`) and output
-settings. Add the following environment variables under **Project Settings →
-Environment Variables** for Production (and Preview if you use preview deployments):
+| Variable                        | Production value                                   | Scope         |
+| ------------------------------- | -------------------------------------------------- | ------------- |
+| `SUPABASE_URL`                  | `https://amtictuisshyiaabhkky.supabase.co`         | Server        |
+| `SUPABASE_PUBLISHABLE_KEY`      | Publishable key for project `amtictuisshyiaabhkky` | Server        |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Secret/service-role key for that project           | Server only   |
+| `VITE_SUPABASE_URL`             | Same project URL                                   | Browser build |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Same publishable key                               | Browser build |
+| `UPI_VPA`                       | `ruttalaashok2001@ybl`                             | Server only   |
+| `UPI_PAYEE_NAME`                | `Ruttala Ashok`                                    | Server        |
+| `ADMIN_EMAILS`                  | `arenastories6@gmail.com`                          | Server        |
 
-| Variable | Value | Visibility |
-| --- | --- | --- |
-| `SUPABASE_URL` | `https://jbqzwtajdzfvdmbwzcjj.supabase.co` | Server |
-| `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_AdcYqRmwnPZyh0qaxr2Rdg_xsIYrkr5` | Server, public key |
-| `VITE_SUPABASE_URL` | Same project URL | Browser build |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Same publishable key | Browser build |
-| `SUPABASE_SERVICE_ROLE_KEY` | This project's `sb_secret_...` key from Supabase Dashboard | **Server only** |
-| `UPI_VPA` | Merchant UPI ID, for example `business@bank` | **Server only** |
-| `UPI_PAYEE_NAME` | Name shown in UPI apps, for example `Arena Stories` | Server |
-| `ADMIN_EMAILS` | Comma-separated Supabase Auth admin email addresses | Server |
+Use the **same Supabase project** for every URL and key. Do not put the secret/service-role key, `UPI_VPA`, or `SUPABASE_ACCESS_TOKEN` in a `VITE_` variable. The browser client deliberately has no fallback project: a missing public configuration fails visibly instead of sending users to an old database. Copy the service-role key and publishable key from the Supabase Dashboard. Never commit the service-role key.
 
-Do not add `SUPABASE_ACCESS_TOKEN` to Vercel: it is needed only to apply database
-migrations. Never prefix the service-role key or UPI VPA with `VITE_`. The deployed
-project needs the SQL migrations in `supabase/migrations` applied to the same
-Supabase project. Redeploy after changing any environment variable.
+The SQL files in `supabase/migrations` are required for a fresh database. The slot rebooking and 12-digit UPI reference migrations have already been applied to project `amtictuisshyiaabhkky`. GitHub or Vercel deployments do not apply database migrations automatically.
+
+After deployment, check that the home page shows live slots, a newly created QR scans as `ruttalaashok2001@ybl`, a 12-digit UPI reference submits, and the admin dashboard loads bookings. Payment status is reviewed manually in `/admin`; submitting a reference alone does not confirm a booking. Redeploy after changing a Vercel environment variable so the new value reaches the build and server functions.
+
+## Checks
+
+```sh
+npm run lint
+npx tsc --noEmit
+npm run build
+```
