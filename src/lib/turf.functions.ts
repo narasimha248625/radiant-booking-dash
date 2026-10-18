@@ -147,27 +147,54 @@ export const getTurfData = createServerFn({
     );
   }
 
-  const [{ data: venues, error: venueError }, { data: slots, error: slotError }] =
-    await Promise.all([
-      supabase.from("venues").select("*").eq("active", true).order("featured", {
-        ascending: false,
-      }),
-
-      supabase
-        .from("slots")
-        .select("*")
-        .gte("slot_date", today)
-        .lte("slot_date", throughDate)
-        .order("slot_date")
-        .order("start_time"),
-    ]);
+  const { data: venues, error: venueError } = await supabase
+    .from("venues")
+    .select("*")
+    .eq("active", true)
+    .order("featured", { ascending: false });
 
   if (venueError) {
     throw new Error(`Could not load the arena: ${venueError.message}`);
   }
 
-  if (slotError) {
-    throw new Error(`Could not load availability: ${slotError.message}`);
+  // Supabase caps one response at 1,000 rows. Three hourly pitches exceed that
+  // in two weeks, so fetch every page before building the date picker.
+  const firstPage = await supabase
+    .from("slots")
+    .select("*")
+    .gte("slot_date", today)
+    .lte("slot_date", throughDate)
+    .order("slot_date")
+    .order("start_time")
+    .order("venue_id")
+    .order("court_label")
+    .order("id")
+    .range(0, 999);
+
+  if (firstPage.error) {
+    throw new Error(`Could not load availability: ${firstPage.error.message}`);
+  }
+
+  const slots = firstPage.data ?? [];
+  let pageLength = slots.length;
+  for (let offset = 1_000; pageLength === 1_000; offset += 1_000) {
+    const page = await supabase
+      .from("slots")
+      .select("*")
+      .gte("slot_date", today)
+      .lte("slot_date", throughDate)
+      .order("slot_date")
+      .order("start_time")
+      .order("venue_id")
+      .order("court_label")
+      .order("id")
+      .range(offset, offset + 999);
+
+    if (page.error) {
+      throw new Error(`Could not load availability: ${page.error.message}`);
+    }
+    pageLength = page.data?.length ?? 0;
+    slots.push(...(page.data ?? []));
   }
 
   const transformedVenues = (venues ?? []).map((venue) => ({
@@ -177,7 +204,7 @@ export const getTurfData = createServerFn({
   }));
 
   const availableSlots =
-    slots && slots.length > 0
+    slots.length > 0
       ? slots
       : createHourlyFallbackSlots(
           transformedVenues.map((venue) => venue.id),

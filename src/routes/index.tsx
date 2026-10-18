@@ -18,13 +18,13 @@ import { useMemo, useState, useEffect } from "react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
+import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import {
   ArrowDown,
   ArrowRight,
+  CalendarDays,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
   MapPin,
   Menu,
@@ -43,7 +43,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BrandLogo } from "@/components/brand-logo";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getBookingPrice, getHourPrice, getStartingPrice } from "@/lib/pricing";
 import { useTheme } from "@/hooks/use-theme";
 import {
@@ -174,6 +175,14 @@ function isSlotAvailable(slot: { status: string; reserved_count: number; capacit
   );
 }
 
+function formatDay(value: string) {
+  return new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  }).format(new Date(`${value}T12:00:00`));
+}
+
 /* ─────────────────────────────────────────────────────────
    Main component
    ───────────────────────────────────────────────────────── */
@@ -201,19 +210,16 @@ function ArenaStories() {
     () =>
       slots.filter(
         (slot) =>
-          venue?.booking_enabled &&
           slot.venue_id === venueId &&
           new Date(`${slot.slot_date}T${slot.start_time}+05:30`).getTime() > currentTime,
       ),
-    [slots, venueId, currentTime, venue?.booking_enabled],
+    [slots, venueId, currentTime],
   );
 
   /* Unique sorted dates for the selected venue */
   const days = [...new Set(venueSlots.map((slot) => slot.slot_date))].sort();
   const [selectedDate, setSelectedDate] = useState("");
   const activeDate = days.includes(selectedDate) ? selectedDate : (days[0] ?? "");
-  const dayIndex = days.indexOf(activeDate);
-  const visibleDates = days.slice(Math.max(0, dayIndex - 2), Math.min(days.length, dayIndex + 3));
   const slotsForDate = venueSlots.filter((slot) => slot.slot_date === activeDate);
   const hasMainCourt = slotsForDate.some((slot) => slot.court_label === "Main");
   const activeSlots = slotsForDate
@@ -413,13 +419,9 @@ function ArenaStories() {
     setError("");
   };
 
-  const moveDate = (offset: number) => {
-    const date = days[dayIndex + offset];
-    if (date) selectDate(date);
-  };
-
   /** Select a continuous range by tapping its first and last hour. */
   const selectSlot = (slot: (typeof activeSlots)[number]) => {
+    if (!venue?.booking_enabled) return;
     const clickedIndex = activeSlots.findIndex((item) => item.id === slot.id);
     if (clickedIndex < 0 || !isSlotAvailable(slot)) return;
 
@@ -450,14 +452,6 @@ function ArenaStories() {
     setError("");
     setBooking(null);
   };
-
-  /** Format a YYYY-MM-DD date string as "Mon, 23 Sep" */
-  const formatDay = (value: string) =>
-    new Intl.DateTimeFormat("en-IN", {
-      weekday: "short",
-      day: "2-digit",
-      month: "short",
-    }).format(new Date(`${value}T12:00:00`));
 
   /** Format a HH:mm:ss time string as "6:30 PM" */
   const formatTime = (value: string) =>
@@ -610,19 +604,15 @@ function ArenaStories() {
             ══════════════════════════════════════════ */}
         <header className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
           <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 lg:h-20 lg:px-8">
-            {/* Brand logo — crest icon + Stories Arena */}
-            <a
-              href="#top"
-              className="group flex min-w-0 select-none items-center gap-3 font-sans text-xl font-extrabold tracking-tight text-foreground"
-            >
-              <BrandLogo
-                size={36}
-                className="transition-transform duration-300 group-hover:scale-105"
+            {/* Uploaded Stories Arena logo */}
+            <a href="#top" className="group flex min-w-0 select-none items-center">
+              <img
+                src="/stories-arena-logo.png"
+                alt="Stories Arena home"
+                width={144}
+                height={96}
+                className="h-16 w-28 bg-black object-contain transition-transform duration-300 group-hover:scale-105 lg:h-20 lg:w-36"
               />
-              <span>
-                <span className="brand-shimmer">STORIES</span>
-                <span className="text-foreground/80">//ARENA</span>
-              </span>
             </a>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -821,36 +811,9 @@ function ArenaStories() {
                 </select>
               </div>
 
-              {/* Date nav */}
-              <div className="mt-5 flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p>
-                  <p className="mt-1 font-display text-2xl">
-                    {activeDate ? formatDay(activeDate) : "No dates"}
-                  </p>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="border border-hero-foreground/20 text-hero-foreground hover:bg-hero-foreground hover:text-hero"
-                    aria-label="Previous match day"
-                    disabled={dayIndex <= 0}
-                    onClick={() => moveDate(-1)}
-                  >
-                    <ChevronLeft />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="border border-hero-foreground/20 text-hero-foreground hover:bg-hero-foreground hover:text-hero"
-                    aria-label="Next match day"
-                    disabled={dayIndex < 0 || dayIndex >= days.length - 1}
-                    onClick={() => moveDate(1)}
-                  >
-                    <ChevronRight />
-                  </Button>
-                </div>
+              <div className="mt-5">
+                <p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p>
+                <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} hero />
               </div>
 
               {/* Quick slot preview (max 3) */}
@@ -861,6 +824,7 @@ function ArenaStories() {
                   .map((slot) => (
                     <Button
                       key={slot.id}
+                      disabled={!venue.booking_enabled}
                       variant={slot.id === slotId ? "sport" : "ghost"}
                       className={`h-14 border text-xs ${
                         slot.id === slotId
@@ -1175,53 +1139,10 @@ function ArenaStories() {
                   </p>
                 )}
 
-                {/* Date navigation */}
-                <div className="mt-8 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase text-muted-foreground">Select date</p>
-                    <h3 className="mt-1 font-display text-4xl">
-                      {activeDate ? formatDay(activeDate) : "No dates"}
-                    </h3>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="icon"
-                      variant="sportOutline"
-                      aria-label="Previous day"
-                      disabled={dayIndex <= 0}
-                      onClick={() => moveDate(-1)}
-                    >
-                      <ChevronLeft />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="sportOutline"
-                      aria-label="Next day"
-                      disabled={dayIndex < 0 || dayIndex >= days.length - 1}
-                      onClick={() => moveDate(1)}
-                    >
-                      <ChevronRight />
-                    </Button>
-                  </div>
+                <div className="mt-8">
+                  <p className="text-xs font-bold uppercase text-muted-foreground">Select date</p>
+                  <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} />
                 </div>
-
-                {days.length > 0 && (
-                  <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
-                    {visibleDates.map((date) => (
-                      <Button
-                        key={date}
-                        type="button"
-                        variant={date === activeDate ? "sport" : "sportOutline"}
-                        aria-pressed={date === activeDate}
-                        aria-label={`Select ${formatDay(date)}`}
-                        className="h-12 px-2 text-[11px] sm:text-xs"
-                        onClick={() => selectDate(date)}
-                      >
-                        {formatDay(date)}
-                      </Button>
-                    ))}
-                  </div>
-                )}
 
                 <p className="mt-5 text-sm font-semibold text-muted-foreground">
                   Select a starting hour below. Then choose how many consecutive hours to book.
@@ -1238,7 +1159,7 @@ function ArenaStories() {
                   ) : (
                     activeSlots.map((slot) => {
                       const available = isSlotAvailable(slot);
-                      const unavailable = !available;
+                      const unavailable = !available || !venue.booking_enabled;
                       const selected = selectedSlots.some(
                         (selectedSlot) => selectedSlot.id === slot.id,
                       );
@@ -1253,18 +1174,23 @@ function ArenaStories() {
                           onClick={() => selectSlot(slot)}
                         >
                           <span>
-                            {formatTime(slot.start_time)} · ₹{getHourPrice(venue, slot.start_time)}
+                            {formatTime(slot.start_time)}
+                            {venue.booking_enabled
+                              ? ` · ₹${getHourPrice(venue, slot.start_time)}`
+                              : " · Call for price"}
                           </span>
                           <span className="text-[10px] normal-case opacity-65">
-                            {slot.status === "booked" || slot.reserved_count >= slot.capacity
-                              ? "Booked"
-                              : slot.status === "held"
-                                ? "Booked — approval pending"
-                                : slot.status === "limited"
-                                  ? "Limited availability"
-                                  : selected
-                                    ? "Selected"
-                                    : "Available"}
+                            {!venue.booking_enabled
+                              ? "Call to book"
+                              : slot.status === "booked" || slot.reserved_count >= slot.capacity
+                                ? "Booked"
+                                : slot.status === "held"
+                                  ? "Booked — approval pending"
+                                  : slot.status === "limited"
+                                    ? "Limited availability"
+                                    : selected
+                                      ? "Selected"
+                                      : "Available"}
                           </span>
                         </Button>
                       );
@@ -1634,14 +1560,14 @@ function ArenaStories() {
         <footer className="border-t border-border bg-surface-inverse px-5 py-10 text-surface-inverse-foreground lg:px-8">
           <div className="mx-auto grid max-w-7xl gap-8 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div>
-              {/* Footer logo with crest */}
-              <div className="flex items-center gap-3">
-                <BrandLogo size={40} glow={false} />
-                <p className="font-display text-3xl sm:text-5xl">
-                  <span className="brand-shimmer">STORIES</span>
-                  <span className="text-surface-inverse-foreground/80">//ARENA</span>
-                </p>
-              </div>
+              <img
+                src="/stories-arena-logo.png"
+                alt="Stories Arena"
+                width={240}
+                height={160}
+                loading="lazy"
+                className="h-32 w-auto bg-black object-contain"
+              />
               <p className="mt-2 text-sm text-surface-inverse-foreground/55">
                 YOUR GAME. YOUR STORY. YOUR ARENA.
               </p>
@@ -1666,6 +1592,60 @@ function ArenaStories() {
 /* ─────────────────────────────────────────────────────────
    Helper sub-components
    ───────────────────────────────────────────────────────── */
+
+function MatchDatePicker({
+  days,
+  activeDate,
+  onSelect,
+  hero = false,
+}: {
+  days: string[];
+  activeDate: string;
+  onSelect: (date: string) => void;
+  hero?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const availableDays = new Set(days);
+  const selected = activeDate ? parseISO(activeDate) : undefined;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant={hero ? "ghost" : "sportOutline"}
+          disabled={days.length === 0}
+          aria-label={
+            activeDate
+              ? `Choose match date, currently ${formatDay(activeDate)}`
+              : "No available match dates"
+          }
+          className={
+            hero
+              ? "mt-2 h-12 w-full justify-start gap-3 border border-hero-foreground/20 px-3 text-hero-foreground hover:border-primary hover:bg-hero-foreground/10 hover:text-hero-foreground"
+              : "mt-2 h-12 w-full justify-start gap-3"
+          }
+        >
+          <CalendarDays className="h-4 w-4 shrink-0" />
+          {activeDate ? formatDay(activeDate) : "No available dates"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={selected}
+          defaultMonth={selected ?? (days[0] ? parseISO(days[0]) : new Date())}
+          disabled={(day) => !availableDays.has(format(day, "yyyy-MM-dd"))}
+          onSelect={(day) => {
+            if (!day) return;
+            onSelect(format(day, "yyyy-MM-dd"));
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 /** Section title with leading number, kicker, and large heading */
 function SectionTitle({

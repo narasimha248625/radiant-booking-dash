@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { BrandLogo } from "./brand-logo";
 
 export function SplashScreen() {
   const [show, setShow] = useState(true);
@@ -17,14 +16,16 @@ export function SplashScreen() {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background transition-opacity duration-700 ${animateOut ? "opacity-0" : "opacity-100"}`}
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black transition-opacity duration-700 ${animateOut ? "opacity-0" : "opacity-100"}`}
     >
-      <BrandLogo size={120} glow={true} className="animate-pulse" />
-      <h1 className="mt-8 font-display text-4xl tracking-tight text-foreground sm:text-6xl">
-        <span className="brand-shimmer">STORIES</span>
-        <span className="text-foreground/80">//ARENA</span>
-      </h1>
-      <p className="mt-4 text-sm font-medium text-muted-foreground uppercase tracking-widest animate-pulse">
+      <img
+        src="/stories-arena-logo.png"
+        alt="Stories Arena"
+        width={360}
+        height={240}
+        className="w-72 max-w-[85vw] object-contain sm:w-96"
+      />
+      <p className="mt-4 text-sm font-medium text-white/70 uppercase tracking-widest animate-pulse">
         Premium Box Cricket
       </p>
     </div>
