@@ -604,15 +604,21 @@ function ArenaStories() {
             ══════════════════════════════════════════ */}
         <header className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
           <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 lg:h-20 lg:px-8">
-            {/* Uploaded Stories Arena logo */}
-            <a href="#top" className="group flex min-w-0 select-none items-center">
+            <a
+              href="#top"
+              aria-label="Stories Arena home"
+              className="group flex w-fit min-w-0 select-none flex-col items-center justify-center gap-0.5"
+            >
               <img
-                src="/stories-arena-logo.png"
-                alt="Stories Arena home"
-                width={144}
-                height={96}
-                className="h-16 w-28 bg-black object-contain transition-transform duration-300 group-hover:scale-105 lg:h-20 lg:w-36"
+                src="/stories-arena-runner-badge.png"
+                alt=""
+                width={56}
+                height={56}
+                className="h-11 w-11 object-contain transition-transform duration-300 group-hover:scale-105 lg:h-14 lg:w-14"
               />
+              <span className="whitespace-nowrap font-sans text-[9px] font-extrabold leading-none tracking-[0.12em] text-foreground lg:text-[11px]">
+                STORIES ARENA
+              </span>
             </a>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -1560,14 +1566,19 @@ function ArenaStories() {
         <footer className="border-t border-border bg-surface-inverse px-5 py-10 text-surface-inverse-foreground lg:px-8">
           <div className="mx-auto grid max-w-7xl gap-8 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div>
-              <img
-                src="/stories-arena-logo.png"
-                alt="Stories Arena"
-                width={240}
-                height={160}
-                loading="lazy"
-                className="h-32 w-auto bg-black object-contain"
-              />
+              <div className="flex w-fit flex-col items-center gap-1">
+                <img
+                  src="/stories-arena-runner-badge.png"
+                  alt=""
+                  width={96}
+                  height={96}
+                  loading="lazy"
+                  className="h-24 w-24 object-contain"
+                />
+                <span className="font-sans text-lg font-extrabold tracking-[0.12em] text-surface-inverse-foreground">
+                  STORIES ARENA
+                </span>
+              </div>
               <p className="mt-2 text-sm text-surface-inverse-foreground/55">
                 YOUR GAME. YOUR STORY. YOUR ARENA.
               </p>
