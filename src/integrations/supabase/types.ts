@@ -14,6 +14,8 @@ export type Database = {
           booking_code: string;
           created_at: string;
           customer_session_id: string | null;
+          customer_email: string | null;
+          welcome_discount_amount: number;
           id: string;
           duration_hours: number;
           hold_expires_at: string | null;
@@ -32,6 +34,8 @@ export type Database = {
           booking_code: string;
           created_at?: string;
           customer_session_id?: string | null;
+          customer_email?: string | null;
+          welcome_discount_amount?: number;
           id?: string;
           duration_hours?: number;
           hold_expires_at?: string | null;
@@ -50,6 +54,8 @@ export type Database = {
           booking_code?: string;
           created_at?: string;
           customer_session_id?: string | null;
+          customer_email?: string | null;
+          welcome_discount_amount?: number;
           id?: string;
           duration_hours?: number;
           hold_expires_at?: string | null;
@@ -175,6 +181,9 @@ export type Database = {
           price_morning: number | null;
           price_day: number | null;
           price_night: number | null;
+          walkin_price_morning: number | null;
+          walkin_price_day: number | null;
+          walkin_price_night: number | null;
           booking_enabled: boolean;
           rating: number;
           updated_at: string;
@@ -193,6 +202,9 @@ export type Database = {
           price_morning?: number | null;
           price_day?: number | null;
           price_night?: number | null;
+          walkin_price_morning?: number | null;
+          walkin_price_day?: number | null;
+          walkin_price_night?: number | null;
           booking_enabled?: boolean;
           rating?: number;
           updated_at?: string;
@@ -211,6 +223,9 @@ export type Database = {
           price_morning?: number | null;
           price_day?: number | null;
           price_night?: number | null;
+          walkin_price_morning?: number | null;
+          walkin_price_day?: number | null;
+          walkin_price_night?: number | null;
           booking_enabled?: boolean;
           rating?: number;
           updated_at?: string;
@@ -253,6 +268,7 @@ export type Database = {
       reserve_booking_slots: {
         Args: {
           p_player_name: string;
+          p_customer_email: string;
           p_payment_reference: string;
           p_customer_session_id: string;
           p_slot_ids: string[];
@@ -263,6 +279,8 @@ export type Database = {
           booking_code: string;
           booking_id: string;
           total_amount: number;
+          base_amount: number;
+          discount_amount: number;
         }[];
       };
       review_upi_payment: {

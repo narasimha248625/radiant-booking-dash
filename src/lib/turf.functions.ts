@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getBookingPrice } from "@/lib/pricing";
 
 const paymentSelectionSchema = z.object({
   venueId: z.string().uuid(),
@@ -18,6 +17,8 @@ const paymentSelectionSchema = z.object({
     .max(3),
 
   playerName: z.string().trim().min(2).max(80),
+
+  customerEmail: z.string().trim().toLowerCase().email().max(254),
 
   teamSize: z.number().int().min(1).max(22),
 
@@ -46,6 +47,10 @@ const cancelReservationSchema = z.object({
 const bookingStatusSchema = z.object({
   bookingId: z.string().uuid(),
   paymentReference: z.string().min(6).max(60),
+});
+
+const welcomeOfferSchema = z.object({
+  customerEmail: z.string().trim().toLowerCase().email().max(254),
 });
 
 function indiaDate(date = new Date()) {
@@ -217,6 +222,26 @@ export const getTurfData = createServerFn({
   };
 });
 
+export const getWelcomeOfferEligibility = createServerFn({ method: "POST" })
+  .validator((input) => welcomeOfferSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: maintenanceError } = await supabaseAdmin.rpc("release_expired_booking_holds");
+    if (maintenanceError) throw new Error("Could not check the welcome offer right now.");
+
+    const { data: booking, error } = await supabaseAdmin
+      .from("bookings")
+      .select("id")
+      .eq("customer_email", data.customerEmail)
+      .gt("welcome_discount_amount", 0)
+      .in("status", ["pending", "confirmed"])
+      .in("payment_status", ["pending", "submitted", "paid"])
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error("Could not check the welcome offer right now.");
+    return { eligible: !booking };
+  });
+
 export const createUpiPaymentRequest = createServerFn({
   method: "POST",
 })
@@ -308,8 +333,6 @@ export const createUpiPaymentRequest = createServerFn({
         throw new Error("This arena is currently unavailable.");
       }
 
-      const totalAmount = getBookingPrice(venue, selectedSlots);
-
       const paymentReference = `SAUPI${crypto
         .randomUUID()
         .replaceAll("-", "")
@@ -325,6 +348,8 @@ export const createUpiPaymentRequest = createServerFn({
 
           p_player_name: data.playerName,
 
+          p_customer_email: data.customerEmail,
+
           p_team_size: data.teamSize,
 
           p_payment_reference: paymentReference,
@@ -339,9 +364,9 @@ export const createUpiPaymentRequest = createServerFn({
         throw new Error(reservationError?.message || "The selected hours were just taken.");
       }
 
-      if (Number(reserved.total_amount) !== totalAmount) {
-        throw new Error("The booking price changed. Please refresh and try again.");
-      }
+      // The database calculates both the current court rate and the one-time
+      // discount in the same transaction that claims the selected hours.
+      const totalAmount = Number(reserved.total_amount);
 
       const query = new URLSearchParams({
         pa: vpa,
@@ -369,6 +394,10 @@ export const createUpiPaymentRequest = createServerFn({
         upiUri: `upi://pay?${query.toString()}`,
 
         amount: totalAmount,
+
+        baseAmount: Number(reserved.base_amount),
+
+        discountAmount: Number(reserved.discount_amount),
 
         durationHours: slotIds.length,
 

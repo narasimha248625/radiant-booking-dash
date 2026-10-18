@@ -45,12 +45,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { getBookingPrice, getHourPrice, getStartingPrice } from "@/lib/pricing";
+import { getBookingPrice, getHourPrice, getStartingPrice, getWelcomeDiscount } from "@/lib/pricing";
 import { useTheme } from "@/hooks/use-theme";
 import {
   cancelPaymentReservation,
   createUpiPaymentRequest,
   getUpiBookingStatus,
+  getWelcomeOfferEligibility,
   getTurfData,
   submitUpiPaymentReference,
 } from "@/lib/turf.functions";
@@ -191,6 +192,7 @@ function ArenaStories() {
   const router = useRouter();
   const createUpiRequest = useServerFn(createUpiPaymentRequest);
   const getUpiStatus = useServerFn(getUpiBookingStatus);
+  const checkWelcomeOffer = useServerFn(getWelcomeOfferEligibility);
   const submitUpiReference = useServerFn(submitUpiPaymentReference);
   const cancelReservation = useServerFn(cancelPaymentReservation);
 
@@ -231,6 +233,11 @@ function ArenaStories() {
   const [durationHours, setDurationHours] = useState(1);
   const [teamSize, setTeamSize] = useState(10);
   const [playerName, setPlayerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [welcomeEligibility, setWelcomeEligibility] = useState<{
+    email: string;
+    eligible: boolean;
+  } | null>(null);
   const [booking, setBooking] = useState<{
     booking_code: string;
     booking_status: string;
@@ -249,12 +256,41 @@ function ArenaStories() {
     paymentReference: string;
     upiUri: string;
     amount: number;
+    baseAmount: number;
+    discountAmount: number;
     durationHours: number;
     slotDate: string;
     startTime: string;
     payeeName: string;
     upiVpa: string;
   } | null>(null);
+
+  const normalizedEmail = customerEmail.trim().toLowerCase();
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+
+  useEffect(() => {
+    setWelcomeEligibility(null);
+    if (!validEmail) return;
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await checkWelcomeOffer({ data: { customerEmail: normalizedEmail } });
+        if (active) setWelcomeEligibility({ email: normalizedEmail, eligible: result.eligible });
+      } catch {
+        // The reservation transaction checks eligibility again before charging.
+      }
+    }, 400);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [
+    checkWelcomeOffer,
+    normalizedEmail,
+    validEmail,
+    upiPayment?.bookingId,
+    booking?.booking_code,
+  ]);
 
   useEffect(() => {
     const history = readPaymentHistory();
@@ -395,6 +431,11 @@ function ArenaStories() {
       ? activeSlots.slice(chosenSlotIndex, chosenSlotIndex + Math.min(durationHours, maxDuration))
       : [];
   const selectedPrice = venue ? getBookingPrice(venue, selectedSlots) : 0;
+  const welcomeDiscount =
+    welcomeEligibility?.email === normalizedEmail && welcomeEligibility.eligible
+      ? getWelcomeDiscount(selectedPrice)
+      : 0;
+  const checkoutPrice = selectedPrice - welcomeDiscount;
 
   /* 4-step progress indicator (1 = venue, 2 = slot, 3 = details, 4 = confirmed) */
   const step = booking ? 4 : slotId ? 3 : venueId ? 2 : 1;
@@ -466,9 +507,10 @@ function ArenaStories() {
       !venue ||
       !venue.booking_enabled ||
       selectedSlots.length !== durationHours ||
-      playerName.trim().length < 2
+      playerName.trim().length < 2 ||
+      !validEmail
     ) {
-      setError("Select a slot and enter the captain's name.");
+      setError("Select a slot, enter the name on your UPI app, and add a valid email.");
       return;
     }
     setSubmitting(true);
@@ -485,6 +527,7 @@ function ArenaStories() {
             courtLabel: slot.court_label,
           })),
           playerName,
+          customerEmail: normalizedEmail,
           teamSize,
           customerSessionId: getCustomerSessionId(),
         },
@@ -1008,36 +1051,63 @@ function ArenaStories() {
                 </article>
               ))}
             </div>
-            {venues.some((item) => item.name.includes("5400")) && (
-              <div className="mt-8 overflow-x-auto border border-border bg-card p-5">
-                <h3 className="font-display text-3xl">5,400 SQ. FT. HOURLY PRICES</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Your booking total adds the price of each selected hour.
-                </p>
-                <table className="mt-5 w-full min-w-[420px] text-left text-sm">
-                  <thead className="border-b border-border text-xs uppercase text-muted-foreground">
-                    <tr>
-                      <th className="py-3 pr-4">Time slot</th>
-                      <th className="py-3 pr-4">Walk-in booking</th>
-                      <th className="py-3 text-primary">Website booking</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {[
-                      { time: "6 AM – 10 AM", walkIn: 649, website: 599 },
-                      { time: "10 AM – 5 PM", walkIn: 549, website: 499 },
-                      { time: "5 PM – 6 AM", walkIn: 749, website: 699 },
-                    ].map((row) => (
-                      <tr key={row.time}>
-                        <td className="py-3 pr-4 font-semibold">{row.time}</td>
-                        <td className="py-3 pr-4">₹{row.walkIn}</td>
-                        <td className="py-3 font-bold text-primary">₹{row.website}</td>
+            <div className="mt-8 grid gap-5 lg:grid-cols-2">
+              {venues.map((item) => (
+                <div key={item.id} className="overflow-x-auto border border-border bg-card p-5">
+                  <h3 className="font-display text-2xl">{item.name}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Hourly prices by time period</p>
+                  <table className="mt-4 w-full min-w-[420px] text-left text-xs">
+                    <thead className="border-b border-border uppercase text-muted-foreground">
+                      <tr>
+                        <th className="py-3 pr-2">Time</th>
+                        <th className="py-3 pr-2">Walk-in</th>
+                        <th className="py-3 pr-2">Website</th>
+                        <th className="py-3 text-primary">First booking*</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {[
+                        {
+                          time: "6 AM – 10 AM",
+                          walkIn: item.walkin_price_morning,
+                          website: item.price_morning,
+                        },
+                        {
+                          time: "10 AM – 5 PM",
+                          walkIn: item.walkin_price_day,
+                          website: item.price_day,
+                        },
+                        {
+                          time: "5 PM – 6 AM",
+                          walkIn: item.walkin_price_night,
+                          website: item.price_night,
+                        },
+                      ].map((row) => (
+                        <tr key={row.time}>
+                          <td className="py-3 pr-2 font-semibold">{row.time}</td>
+                          <td className="py-3 pr-2">
+                            {row.walkIn === null ? "—" : `₹${row.walkIn}`}
+                          </td>
+                          <td className="py-3 pr-2">
+                            {row.website === null ? "—" : `₹${row.website}`}
+                          </td>
+                          <td className="py-3 font-bold text-primary">
+                            {row.website === null
+                              ? "—"
+                              : `₹${row.website - getWelcomeDiscount(row.website)}`}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              *₹150 off the first website booking per email address. The welcome discount is applied
+              once to the whole booking, even when you book multiple hours. A dash means the court
+              price has not been set yet.
+            </p>
           </div>
         </section>
 
@@ -1242,19 +1312,19 @@ function ArenaStories() {
 
                 {/* Booking details */}
                 <div className="mt-8 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  {/* Captain's name */}
+                  {/* The payment name helps staff match the UPI receipt. */}
                   <div>
                     <label
                       htmlFor="player-name"
                       className="text-xs font-bold uppercase text-muted-foreground"
                     >
-                      Captain's name
+                      Name on PhonePe / GPay / Paytm
                     </label>
                     <input
                       id="player-name"
                       value={playerName}
                       onChange={(e) => setPlayerName(e.target.value)}
-                      placeholder="Your full name"
+                      placeholder="Name shown in your payment app"
                       minLength={2}
                       required
                       className="mt-2 h-12 w-full border border-input bg-background px-4 outline-hidden placeholder:text-muted-foreground focus:border-primary"
@@ -1286,6 +1356,35 @@ function ArenaStories() {
                       </Button>
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <label
+                    htmlFor="customer-email"
+                    className="text-xs font-bold uppercase text-muted-foreground"
+                  >
+                    Email address
+                  </label>
+                  <input
+                    id="customer-email"
+                    type="email"
+                    value={customerEmail}
+                    onChange={(event) => setCustomerEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    required
+                    className="mt-2 h-12 w-full border border-input bg-background px-4 outline-hidden placeholder:text-muted-foreground focus:border-primary"
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Your first website booking with this email gets ₹150 off the total.
+                  </p>
+                  {validEmail && welcomeEligibility?.email === normalizedEmail && (
+                    <p className="mt-1 text-xs font-semibold text-primary">
+                      {welcomeEligibility.eligible
+                        ? "Welcome offer available for this email."
+                        : "Welcome offer already used or reserved for this email."}
+                    </p>
+                  )}
                 </div>
 
                 {/* Error message */}
@@ -1376,6 +1475,12 @@ function ArenaStories() {
                   <div>
                     <p className="text-xs font-bold uppercase text-primary">Pay with any UPI app</p>
                     <h3 className="mt-2 font-display text-4xl">₹{upiPayment.amount}</h3>
+                    {upiPayment.discountAmount > 0 && (
+                      <p className="mt-2 text-sm font-semibold text-primary">
+                        ₹{upiPayment.discountAmount} welcome discount applied to ₹
+                        {upiPayment.baseAmount}
+                      </p>
+                    )}
                     <p className="mt-3 text-sm text-muted-foreground">
                       Works with PhonePe, Google Pay, Paytm, BHIM, and other Indian UPI apps.
                     </p>
@@ -1462,10 +1567,21 @@ function ArenaStories() {
                     </div>
 
                     <div className="flex items-end justify-between py-6">
-                      <span className="text-sm text-muted-foreground">Total</span>
+                      <span className="text-sm text-muted-foreground">
+                        {welcomeDiscount > 0 ? (
+                          <>
+                            Website ₹{selectedPrice}
+                            <span className="block font-semibold text-primary">
+                              Welcome offer −₹{welcomeDiscount}
+                            </span>
+                          </>
+                        ) : (
+                          "Total"
+                        )}
+                      </span>
                       <span className="font-display text-5xl">
                         {venue.booking_enabled
-                          ? `₹${chosenSlot ? selectedPrice : getStartingPrice(venue)}`
+                          ? `₹${chosenSlot ? checkoutPrice : getStartingPrice(venue)}`
                           : "Call for pricing"}
                       </span>
                     </div>
@@ -1478,7 +1594,8 @@ function ArenaStories() {
                         !venue.booking_enabled ||
                         submitting ||
                         !slotId ||
-                        playerName.trim().length < 2
+                        playerName.trim().length < 2 ||
+                        !validEmail
                       }
                       onClick={confirmBooking}
                     >
@@ -1489,14 +1606,17 @@ function ArenaStories() {
                           : !slotId
                             ? "Select a time slot"
                             : playerName.trim().length < 2
-                              ? "Enter captain's name"
-                              : `Pay ₹${selectedPrice}`}{" "}
+                              ? "Enter the name on your UPI app"
+                              : !validEmail
+                                ? "Enter a valid email"
+                                : `Pay ₹${checkoutPrice}`}{" "}
                       <ArrowRight />
                     </Button>
 
-                    {(!slotId || playerName.trim().length < 2) && (
+                    {(!slotId || playerName.trim().length < 2 || !validEmail) && (
                       <p className="mt-3 text-center text-xs text-muted-foreground">
-                        Select a slot and enter the captain&apos;s name to continue to payment.
+                        Select a slot, enter the name on your UPI app, and add your email to
+                        continue to payment.
                       </p>
                     )}
 

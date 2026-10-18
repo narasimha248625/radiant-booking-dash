@@ -75,6 +75,7 @@ export const addVenueAdmin = createServerFn({ method: "POST" })
             rating: 5.0,
             amenities: ["Unlimited Wi-Fi", "Drinking water", "Washroom", "Music"],
             image_key: "hero",
+            booking_enabled: false,
           },
         ])
         .select()
@@ -139,6 +140,44 @@ export const updateVenueAdmin = createServerFn({ method: "POST" })
     } catch (err: unknown) {
       console.error("[updateVenueAdmin] Failed to update venue:", err);
       return { success: false, error: errorMessage(err) };
+    }
+  });
+
+const courtPricingSchema = z.object({
+  id: z.string().uuid(),
+  price_morning: z.number().positive().nullable(),
+  price_day: z.number().positive().nullable(),
+  price_night: z.number().positive().nullable(),
+  walkin_price_morning: z.number().positive().nullable(),
+  walkin_price_day: z.number().positive().nullable(),
+  walkin_price_night: z.number().positive().nullable(),
+});
+
+export const updateCourtPricingAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdminAuth])
+  .validator((input) => courtPricingSchema.parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { id, ...prices } = data;
+      const websiteRates = [prices.price_morning, prices.price_day, prices.price_night];
+      const bookingEnabled = websiteRates.every((price) => price !== null);
+      const { data: venue, error } = await supabaseAdmin
+        .from("venues")
+        .update({
+          ...prices,
+          booking_enabled: bookingEnabled,
+          ...(bookingEnabled ? { price_per_hour: Math.min(...(websiteRates as number[])) } : {}),
+        })
+        .eq("id", id)
+        .select("*")
+        .single();
+
+      if (error || !venue) throw new Error(error?.message || "Pitch not found");
+      return { success: true as const, venue };
+    } catch (error) {
+      console.error("[updateCourtPricingAdmin] Failed to update prices:", error);
+      return { success: false as const, error: errorMessage(error) };
     }
   });
 

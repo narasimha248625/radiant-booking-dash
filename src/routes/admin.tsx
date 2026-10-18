@@ -6,6 +6,7 @@ import {
   addVenueAdmin,
   removeVenueAdmin,
   updateVenueAdmin,
+  updateCourtPricingAdmin,
   addSlotAdmin,
   removeSlotAdmin,
   reviewUpiPaymentAdmin,
@@ -45,6 +46,37 @@ type AdminBooking = Tables<"bookings"> & {
 };
 type AdminSlot = Tables<"slots"> & { venues: { name: string } | null };
 
+type PricingDraft = Pick<
+  AdminVenue,
+  | "price_morning"
+  | "price_day"
+  | "price_night"
+  | "walkin_price_morning"
+  | "walkin_price_day"
+  | "walkin_price_night"
+>;
+
+const priceBands = [
+  {
+    label: "6 AM – 10 AM",
+    website: "price_morning",
+    walkin: "walkin_price_morning",
+  },
+  { label: "10 AM – 5 PM", website: "price_day", walkin: "walkin_price_day" },
+  { label: "5 PM – 6 AM", website: "price_night", walkin: "walkin_price_night" },
+] as const;
+
+function pricingDraft(venue: AdminVenue): PricingDraft {
+  return {
+    price_morning: venue.price_morning,
+    price_day: venue.price_day,
+    price_night: venue.price_night,
+    walkin_price_morning: venue.walkin_price_morning,
+    walkin_price_day: venue.walkin_price_day,
+    walkin_price_night: venue.walkin_price_night,
+  };
+}
+
 function messageFrom(error: unknown) {
   return error instanceof Error ? error.message : "An error occurred";
 }
@@ -69,6 +101,7 @@ function AdminPanel() {
   const addVenueFn = useServerFn(addVenueAdmin);
   const removeVenueFn = useServerFn(removeVenueAdmin);
   const updateVenueFn = useServerFn(updateVenueAdmin);
+  const updateCourtPricingFn = useServerFn(updateCourtPricingAdmin);
   const addSlotFn = useServerFn(addSlotAdmin);
   const removeSlotFn = useServerFn(removeSlotAdmin);
   const reviewUpiPaymentFn = useServerFn(reviewUpiPaymentAdmin);
@@ -80,6 +113,8 @@ function AdminPanel() {
   }, [getAdminDataFn]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pricingDrafts, setPricingDrafts] = useState<Record<string, PricingDraft>>({});
+  const [savingPricingId, setSavingPricingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSlotLoading, setIsSlotLoading] = useState(false);
   const [newSlot, setNewSlot] = useState({
@@ -96,6 +131,32 @@ function AdminPanel() {
     description: "",
     price_per_hour: 700,
   });
+
+  useEffect(() => {
+    setPricingDrafts((current) => {
+      const next = { ...current };
+      for (const venue of venues) {
+        if (!next[venue.id]) next[venue.id] = pricingDraft(venue);
+      }
+      return next;
+    });
+  }, [venues]);
+
+  const handleSavePricing = async (venue: AdminVenue) => {
+    const draft = pricingDrafts[venue.id] ?? pricingDraft(venue);
+    setSavingPricingId(venue.id);
+    try {
+      const result = await updateCourtPricingFn({ data: { id: venue.id, ...draft } });
+      if (!result.success) throw new Error(result.error);
+      setPricingDrafts((current) => ({ ...current, [venue.id]: pricingDraft(result.venue) }));
+      toast.success(`${venue.name} prices saved`);
+      await refreshAdminData();
+    } catch (error) {
+      toast.error(messageFrom(error));
+    } finally {
+      setSavingPricingId(null);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -187,6 +248,7 @@ function AdminPanel() {
     await supabase.auth.signOut();
     setIsAuthenticated(false);
     setAdminData({ venues: [], bookings: [], slots: [] });
+    setPricingDrafts({});
     toast.success("Logged out");
   };
 
@@ -411,7 +473,7 @@ function AdminPanel() {
         </div>
 
         <Tabs defaultValue="bookings" className="w-full flex-1 flex flex-col min-h-0">
-          <TabsList className="bg-zinc-900 border border-zinc-800 mb-4 shrink-0">
+          <TabsList className="mb-4 max-w-full shrink-0 justify-start overflow-x-auto border border-zinc-800 bg-zinc-900">
             <TabsTrigger
               value="bookings"
               className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
@@ -423,6 +485,12 @@ function AdminPanel() {
               className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
             >
               Turfs (Pitches)
+            </TabsTrigger>
+            <TabsTrigger
+              value="pricing"
+              className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
+            >
+              Court Pricing
             </TabsTrigger>
             <TabsTrigger
               value="slots"
@@ -447,7 +515,7 @@ function AdminPanel() {
                       <TableHeader className="bg-zinc-950 sticky top-0 z-10">
                         <TableRow className="border-zinc-800 hover:bg-zinc-950/50">
                           <TableHead className="text-zinc-400">Code</TableHead>
-                          <TableHead className="text-zinc-400">User / Player</TableHead>
+                          <TableHead className="text-zinc-400">UPI name / Email</TableHead>
                           <TableHead className="text-zinc-400">Venue</TableHead>
                           <TableHead className="text-zinc-400">Date & Time</TableHead>
                           <TableHead className="text-zinc-400">Duration</TableHead>
@@ -468,7 +536,14 @@ function AdminPanel() {
                             <TableCell className="font-medium text-white">
                               {booking.booking_code}
                             </TableCell>
-                            <TableCell className="text-zinc-300">{booking.player_name}</TableCell>
+                            <TableCell className="text-zinc-300">
+                              {booking.player_name}
+                              {booking.customer_email && (
+                                <span className="block text-xs text-zinc-400">
+                                  {booking.customer_email}
+                                </span>
+                              )}
+                            </TableCell>
                             <TableCell className="text-zinc-300">
                               {booking.venues?.name || "Unknown"}
                             </TableCell>
@@ -517,6 +592,11 @@ function AdminPanel() {
                             <TableCell className="text-zinc-300">{booking.status}</TableCell>
                             <TableCell className="text-right text-[#00D084]">
                               ₹{booking.amount}
+                              {booking.welcome_discount_amount > 0 && (
+                                <span className="block text-xs text-zinc-400">
+                                  ₹{booking.welcome_discount_amount} welcome off
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className="text-right">
                               {booking.payment_status === "submitted" ? (
@@ -719,6 +799,98 @@ function AdminPanel() {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="pricing" className="mt-0 min-h-0 flex-1 overflow-y-auto pb-6">
+            <div className="grid gap-5">
+              {venues.map((venue) => {
+                const draft = pricingDrafts[venue.id] ?? pricingDraft(venue);
+                const websiteReady = [
+                  draft.price_morning,
+                  draft.price_day,
+                  draft.price_night,
+                ].every((price) => price !== null && price > 0);
+                return (
+                  <Card key={venue.id} className="border-zinc-800 bg-zinc-900/95 text-white">
+                    <CardHeader>
+                      <CardTitle>{venue.name}</CardTitle>
+                      <CardDescription className="text-zinc-400">
+                        Save website and walk-in prices for each one-hour period. The three website
+                        rates enable online booking for this pitch.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid gap-3">
+                        <div className="hidden grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)] gap-3 text-xs font-bold uppercase text-zinc-400 sm:grid">
+                          <span>Time period</span>
+                          <span>Website / hour</span>
+                          <span>Walk-in / hour</span>
+                        </div>
+                        {priceBands.map((band) => (
+                          <div
+                            key={band.website}
+                            className="grid gap-3 border-t border-zinc-800 pt-3 sm:grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)] sm:items-end"
+                          >
+                            <span className="font-semibold">{band.label}</span>
+                            {(["website", "walkin"] as const).map((kind) => {
+                              const field = band[kind];
+                              return (
+                                <div key={field}>
+                                  <Label
+                                    htmlFor={`${venue.id}-${field}`}
+                                    className="text-xs text-zinc-400 sm:sr-only"
+                                  >
+                                    {kind === "website" ? "Website" : "Walk-in"} price for{" "}
+                                    {band.label}
+                                  </Label>
+                                  <Input
+                                    id={`${venue.id}-${field}`}
+                                    type="number"
+                                    min="1"
+                                    step="0.01"
+                                    inputMode="decimal"
+                                    value={draft[field] ?? ""}
+                                    onChange={(event) =>
+                                      setPricingDrafts((current) => ({
+                                        ...current,
+                                        [venue.id]: {
+                                          ...draft,
+                                          [field]:
+                                            event.target.value === ""
+                                              ? null
+                                              : Number(event.target.value),
+                                        },
+                                      }))
+                                    }
+                                    placeholder="₹ per hour"
+                                    className="border-zinc-700 bg-zinc-800 text-white"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-xs text-zinc-400">
+                          {websiteReady
+                            ? "Online booking will be available after saving."
+                            : "Enter all three website prices to enable online booking."}
+                        </p>
+                        <Button
+                          type="button"
+                          disabled={savingPricingId !== null}
+                          onClick={() => void handleSavePricing(venue)}
+                          className="bg-[#00D084] font-semibold text-black hover:bg-[#00D084]/90"
+                        >
+                          {savingPricingId === venue.id ? "Saving…" : "Save prices"}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </TabsContent>
 

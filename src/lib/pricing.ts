@@ -5,6 +5,12 @@ export type PricedVenue = {
   price_night: number | null;
 };
 
+export const WELCOME_DISCOUNT = 150;
+
+export function getWelcomeDiscount(baseAmount: number): number {
+  return Math.min(WELCOME_DISCOUNT, Math.max(0, baseAmount - 1));
+}
+
 // Time bands use the hour at which each booked slot starts, including bookings
 // that span two bands.
 export function getHourPrice(venue: PricedVenue, startTime: string): number {
