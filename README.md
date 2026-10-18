@@ -1,6 +1,8 @@
-# Arena Stories booking
+# Stories Arena booking
 
 TanStack Start booking site with hourly turf availability, UPI QR payments, and an admin review dashboard. The `main` branch is connected to Lovable. Keep pushed history intact; use normal commits and pushes.
+
+The 5,400 sq. ft. pitch uses website rates of ₹599 (6–10 AM), ₹499 (10 AM–5 PM), and ₹699 (5 PM–6 AM). The 1,080 sq. ft. and separate bowling-machine pitches are listed with online booking disabled until their full time-slot rates are provided.
 
 ## Local development
 
@@ -33,7 +35,7 @@ Open `http://localhost:8080/` for booking and `http://localhost:8080/admin` for 
 
 Use the **same Supabase project** for every URL and key. Do not put the secret/service-role key, `UPI_VPA`, or `SUPABASE_ACCESS_TOKEN` in a `VITE_` variable. The browser client deliberately has no fallback project: a missing public configuration fails visibly instead of sending users to an old database. Copy the service-role key and publishable key from the Supabase Dashboard. Never commit the service-role key.
 
-The SQL files in `supabase/migrations` are required for a fresh database. The slot rebooking and 12-digit UPI reference migrations have already been applied to project `amtictuisshyiaabhkky`. GitHub or Vercel deployments do not apply database migrations automatically.
+The SQL files in `supabase/migrations` are required for a fresh database. GitHub or Vercel deployments do not apply database migrations automatically. The remote hourly booking migration was recorded under a different timestamp with identical SQL; the no-op migration file preserves that remote history.
 
 After deployment, check that the home page shows live slots, a newly created QR scans as `ruttalaashok2001@ybl`, a 12-digit UPI reference submits, and the admin dashboard loads bookings. Payment status is reviewed manually in `/admin`; submitting a reference alone does not confirm a booking. Redeploy after changing a Vercel environment variable so the new value reaches the build and server functions.
 

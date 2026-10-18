@@ -1,0 +1,3 @@
+-- Supabase recorded 20261005190000_hourly_booking_and_upi.sql under this
+-- version in the remote project. The SQL is byte-for-byte identical, so this
+-- local entry preserves the remote migration history without repeating it.

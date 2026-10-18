@@ -73,7 +73,7 @@ export const addVenueAdmin = createServerFn({ method: "POST" })
             active: true,
             featured: false,
             rating: 5.0,
-            amenities: ["Floodlights", "Changing room", "Free parking"],
+            amenities: ["Unlimited Wi-Fi", "Drinking water", "Washroom", "Music"],
             image_key: "hero",
           },
         ])

@@ -6,8 +6,8 @@
 
 /*
  * ═══════════════════════════════════════════════════════════
- *  ARENA STORIES — Design System
- *  Brand: Box Cricket · Bengaluru
+ *  STORIES ARENA — Design System
+ *  Brand: Box Cricket · Visakhapatnam
  *  Primary: Cricket-field emerald green
  *  Accent:  Warm amber / floodlight gold
  * ═══════════════════════════════════════════════════════════
@@ -260,7 +260,7 @@ html { scroll-behavior: smooth; }
 }
 @utility reveal-up { animation: reveal-up 0.7s ease-out both; }
 
-/* Brand shimmer — sweeps across the ARENA STORIES logo text */
+/* Brand shimmer — sweeps across the STORIES ARENA logo text */
 @keyframes brand-shimmer {
   0%   { background-position: -200% center; }
   100% { background-position: 200% center; }

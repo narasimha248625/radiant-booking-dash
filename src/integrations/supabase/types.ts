@@ -172,6 +172,10 @@ export type Database = {
           location: string;
           name: string;
           price_per_hour: number;
+          price_morning: number | null;
+          price_day: number | null;
+          price_night: number | null;
+          booking_enabled: boolean;
           rating: number;
           updated_at: string;
         };
@@ -186,6 +190,10 @@ export type Database = {
           location: string;
           name: string;
           price_per_hour: number;
+          price_morning?: number | null;
+          price_day?: number | null;
+          price_night?: number | null;
+          booking_enabled?: boolean;
           rating?: number;
           updated_at?: string;
         };
@@ -200,6 +208,10 @@ export type Database = {
           location?: string;
           name?: string;
           price_per_hour?: number;
+          price_morning?: number | null;
+          price_day?: number | null;
+          price_night?: number | null;
+          booking_enabled?: boolean;
           rating?: number;
           updated_at?: string;
         };

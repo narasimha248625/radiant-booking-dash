@@ -20,7 +20,7 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <p className="text-xs font-bold uppercase tracking-widest text-primary">Arena Stories</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-primary">Stories Arena</p>
         <h1 className="mt-4 font-display text-7xl text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Pitch not found</h2>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -56,7 +56,7 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
           Something went wrong
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Arena Stories hit a snag. You can try refreshing or head back to the pitch.
+          Stories Arena hit a snag. You can try refreshing or head back to the pitch.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -88,25 +88,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      /* ── Arena Stories primary meta ── */
-      { title: "Arena Stories — Premium Box Cricket Booking" },
+      /* ── Stories Arena primary meta ── */
+      { title: "Stories Arena — Premium Box Cricket Booking" },
       {
         name: "description",
         content:
-          "Book premium box cricket pitches in Bengaluru. Live slot availability, instant confirmation, and an unforgettable game every time.",
+          "Book box cricket pitches in Visakhapatnam. Live slot availability and instant booking confirmation.",
       },
-      { name: "author", content: "Arena Stories" },
+      { name: "author", content: "Stories Arena" },
       /* ── Open Graph ── */
-      { property: "og:title", content: "Arena Stories — Premium Box Cricket Booking" },
+      { property: "og:title", content: "Stories Arena — Premium Box Cricket Booking" },
       {
         property: "og:description",
         content:
-          "Live slots. Floodlit pitches. Instant booking confirmation. Every match, a new story.",
+          "Every match has a story. Every story begins here. Reserve the turf and rule the game.",
       },
       { property: "og:type", content: "website" },
       /* ── Twitter Card ── */
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@ArenaStories" },
       /* ── Theme colour (browser chrome) ── */
       { name: "theme-color", content: "#14532d" },
     ],

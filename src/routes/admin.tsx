@@ -591,13 +591,13 @@ function AdminPanel() {
                           value={newVenue.location}
                           onChange={(e) => setNewVenue({ ...newVenue, location: e.target.value })}
                           className="bg-zinc-800 border-zinc-700 text-white"
-                          placeholder="e.g. Bengaluru • Jayanagar"
+                          placeholder="e.g. Pedda Boddipalli, Vizag Road"
                           required
                         />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="price" className="text-zinc-300">
-                          Price per Hour (₹)
+                          Base Price per Hour (₹)
                         </Label>
                         <Input
                           id="price"
@@ -608,9 +608,12 @@ function AdminPanel() {
                             setNewVenue({ ...newVenue, price_per_hour: Number(e.target.value) })
                           }
                           className="bg-zinc-800 border-zinc-700 text-white"
-                          placeholder="1500"
+                          placeholder="499"
                           required
                         />
+                        <p className="text-xs text-zinc-400">
+                          Scheduled morning, daytime, and night prices override this base price.
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="desc" className="text-zinc-300">
@@ -677,7 +680,18 @@ function AdminPanel() {
                               <TableCell className="font-medium text-white">{venue.name}</TableCell>
                               <TableCell className="text-zinc-300">{venue.location}</TableCell>
                               <TableCell className="text-right text-[#00D084]">
-                                ₹{venue.price_per_hour}
+                                ₹
+                                {Math.min(
+                                  venue.price_morning ?? venue.price_per_hour,
+                                  venue.price_day ?? venue.price_per_hour,
+                                  venue.price_night ?? venue.price_per_hour,
+                                )}
+                                {venue.price_morning != null && (
+                                  <span className="block text-xs text-zinc-400">
+                                    6–10 AM ₹{venue.price_morning} · 10 AM–5 PM ₹{venue.price_day} ·
+                                    5 PM–6 AM ₹{venue.price_night}
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell className="text-right space-x-2">
                                 <Button

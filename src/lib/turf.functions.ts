@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { getBookingPrice } from "@/lib/pricing";
 
 const paymentSelectionSchema = z.object({
   venueId: z.string().uuid(),
@@ -85,7 +86,7 @@ function createHourlyFallbackSlots(venueIds: string[], firstDate: string, days =
 function getUpiConfig() {
   const vpa = process.env["UPI_VPA"];
 
-  const payeeName = process.env["UPI_PAYEE_NAME"] || "Arena Stories";
+  const payeeName = process.env["UPI_PAYEE_NAME"] || "Stories Arena";
 
   if (!vpa || !/^[\w.-]+@[\w.-]+$/.test(vpa)) {
     throw new Error("UPI is not configured. Add the merchant UPI ID as UPI_VPA on the server.");
@@ -169,19 +170,10 @@ export const getTurfData = createServerFn({
     throw new Error(`Could not load availability: ${slotError.message}`);
   }
 
-  const transformedVenues = (venues ?? []).slice(0, 1).map((venue) => ({
+  const transformedVenues = (venues ?? []).map((venue) => ({
     ...venue,
-
-    name: "Arena Stories Box Cricket",
-
-    location:
-      "Boddepalle, Narsipatnam Municipality, behind Hanuman Coffee Cafe, opposite Royal Park Resort, Anakapalli District, Andhra Pradesh 531116",
-
-    contact_phone: "+91 70935 93568",
-
-    contact_name: "Ruttala Ashok",
-
-    price_per_hour: 700,
+    booking_enabled: venue.booking_enabled ?? true,
+    contact_phone: "08932-226982",
   }));
 
   const availableSlots =
@@ -280,18 +272,18 @@ export const createUpiPaymentRequest = createServerFn({
 
       const { data: venue, error: venueError } = await supabaseAdmin
         .from("venues")
-        .select("name, price_per_hour, active")
+        .select("*")
         .eq("id", data.venueId)
         .eq("active", true)
         .single();
 
-      if (venueError || !venue) {
+      if (venueError || !venue || venue.booking_enabled === false) {
         throw new Error("This arena is currently unavailable.");
       }
 
-      const totalAmount = Number(venue.price_per_hour) * slotIds.length;
+      const totalAmount = getBookingPrice(venue, selectedSlots);
 
-      const paymentReference = `ASUPI${crypto
+      const paymentReference = `SAUPI${crypto
         .randomUUID()
         .replaceAll("-", "")
         .slice(0, 20)

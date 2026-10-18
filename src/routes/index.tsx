@@ -1,5 +1,5 @@
 /**
- * Arena Stories — Main Booking Page
+ * Stories Arena — Main Booking Page
  *
  * Single-page app for box cricket pitch booking.
  * Layout:
@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/brand-logo";
+import { getBookingPrice, getHourPrice, getStartingPrice } from "@/lib/pricing";
 import { useTheme } from "@/hooks/use-theme";
 import {
   cancelPaymentReservation,
@@ -62,16 +63,16 @@ import actionImage from "@/assets/match-action.jpg";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Arena Stories — Book Premium Box Cricket Pitches" },
+      { title: "Stories Arena — Book Box Cricket Pitches" },
       {
         name: "description",
         content:
-          "Find live box cricket slot availability, choose your arena, and confirm your match in seconds. Every match, a new story.",
+          "Find live box cricket slots at Stories Arena in Visakhapatnam. Every match has a story. Every story begins here.",
       },
-      { property: "og:title", content: "Arena Stories — Book Premium Box Cricket Pitches" },
+      { property: "og:title", content: "Stories Arena — Book Box Cricket Pitches" },
       {
         property: "og:description",
-        content: "Live slots. Premium pitches. Instant booking confirmation.",
+        content: "Your game. Your story. Your arena. Reserve the turf. Rule the game.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -200,10 +201,11 @@ function ArenaStories() {
     () =>
       slots.filter(
         (slot) =>
+          venue?.booking_enabled &&
           slot.venue_id === venueId &&
           new Date(`${slot.slot_date}T${slot.start_time}+05:30`).getTime() > currentTime,
       ),
-    [slots, venueId, currentTime],
+    [slots, venueId, currentTime, venue?.booking_enabled],
   );
 
   /* Unique sorted dates for the selected venue */
@@ -386,6 +388,7 @@ function ArenaStories() {
     chosenSlotIndex >= 0
       ? activeSlots.slice(chosenSlotIndex, chosenSlotIndex + Math.min(durationHours, maxDuration))
       : [];
+  const selectedPrice = venue ? getBookingPrice(venue, selectedSlots) : 0;
 
   /* 4-step progress indicator (1 = venue, 2 = slot, 3 = details, 4 = confirmed) */
   const step = booking ? 4 : slotId ? 3 : venueId ? 2 : 1;
@@ -465,7 +468,12 @@ function ArenaStories() {
 
   /* ── Booking submission ── */
   async function confirmBooking() {
-    if (!venue || selectedSlots.length !== durationHours || playerName.trim().length < 2) {
+    if (
+      !venue ||
+      !venue.booking_enabled ||
+      selectedSlots.length !== durationHours ||
+      playerName.trim().length < 2
+    ) {
       setError("Select a slot and enter the captain's name.");
       return;
     }
@@ -598,11 +606,11 @@ function ArenaStories() {
       <main className="min-h-screen bg-background text-foreground transition-colors duration-300">
         {/* ══════════════════════════════════════════
             NAVIGATION BAR
-            Fixed header with Arena Stories logo
+            Fixed header with Stories Arena logo
             ══════════════════════════════════════════ */}
         <header className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
           <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 lg:h-20 lg:px-8">
-            {/* Brand logo — Crest icon + "ARENA" in shimmer gold + "//STORIES" */}
+            {/* Brand logo — crest icon + Stories Arena */}
             <a
               href="#top"
               className="group flex min-w-0 select-none items-center gap-3 font-sans text-xl font-extrabold tracking-tight text-foreground"
@@ -612,8 +620,8 @@ function ArenaStories() {
                 className="transition-transform duration-300 group-hover:scale-105"
               />
               <span>
-                <span className="brand-shimmer">ARENA</span>
-                <span className="text-foreground/80">//STORIES</span>
+                <span className="brand-shimmer">STORIES</span>
+                <span className="text-foreground/80">//ARENA</span>
               </span>
             </a>
 
@@ -743,30 +751,31 @@ function ArenaStories() {
               {/* Kicker line */}
               <div className="mb-8 flex items-center gap-3 text-[11px] font-semibold uppercase text-primary">
                 <span className="h-px w-12 bg-primary" />
-                Box Cricket · Bengaluru
+                Box Cricket · Visakhapatnam
               </div>
 
               {/* Main headline */}
-              <h1 className="max-w-3xl font-display text-6xl leading-[0.88] sm:text-7xl lg:text-[6.7rem]">
-                Where cricket
+              <h1 className="max-w-3xl font-display text-4xl leading-[0.95] sm:text-5xl lg:text-6xl">
+                EVERY MATCH HAS A STORY.
                 <br />
-                <em className="font-normal text-primary">writes its stories.</em>
+                <em className="font-normal text-primary">EVERY STORY BEGINS HERE.</em>
               </h1>
 
               <p className="mt-7 max-w-lg text-sm leading-7 text-hero-muted sm:text-base">
-                Floodlit pitches built for the city's best players. Pick your slot, gather your
-                squad, and let the match do the talking.
+                STORIES ARENA — Where passion meets the pitch and legends write their own chapters.
               </p>
 
               {/* Stats bar */}
               <div className="mt-9 flex items-center gap-8 border-l border-primary pl-5 text-sm">
                 <div>
-                  <p className="font-semibold text-hero-foreground">03 private pitches</p>
-                  <p className="mt-1 text-xs text-hero-muted">Maintained weekly</p>
+                  <p className="font-semibold text-hero-foreground">
+                    {venues.length} booking options
+                  </p>
+                  <p className="mt-1 text-xs text-hero-muted">Open 24/7</p>
                 </div>
                 <div>
                   <p className="font-semibold text-hero-foreground">4.9 match rating</p>
-                  <p className="mt-1 text-xs text-hero-muted">Across Bengaluru</p>
+                  <p className="mt-1 text-xs text-hero-muted">across Visakhapatnam</p>
                 </div>
               </div>
             </div>
@@ -874,12 +883,33 @@ function ArenaStories() {
                 <div>
                   <p className="text-[10px] font-semibold uppercase text-hero-muted">From</p>
                   <p className="font-display text-3xl">
-                    ₹{venue.price_per_hour}
-                    <span className="font-sans text-xs text-hero-muted"> / hour</span>
+                    {venue.booking_enabled
+                      ? `₹${getStartingPrice(venue)}`
+                      : venue.price_per_hour > 0
+                        ? `₹${getStartingPrice(venue)}`
+                        : "Price on request"}
+                    {venue.booking_enabled && (
+                      <span className="font-sans text-xs text-hero-muted"> / hour</span>
+                    )}
                   </p>
                 </div>
-                <Button size="lg" variant="sport" onClick={jumpToBooking}>
-                  {slotId ? "Continue" : "See all slots"} <ArrowRight />
+                <Button
+                  size="lg"
+                  variant="sport"
+                  onClick={
+                    venue.booking_enabled
+                      ? jumpToBooking
+                      : () => {
+                          window.location.href = "tel:08932226982";
+                        }
+                  }
+                >
+                  {venue.booking_enabled
+                    ? slotId
+                      ? "Continue"
+                      : "See all slots"
+                    : "Call for pricing"}{" "}
+                  <ArrowRight />
                 </Button>
               </div>
             </aside>
@@ -946,12 +976,14 @@ function ArenaStories() {
                         <MapPin className="h-4 w-4 shrink-0 text-primary mt-1" />
                         <span>{item.location}</span>
                       </p>
+                      <p className="text-sm leading-relaxed text-muted-foreground">
+                        {item.description}
+                      </p>
                       <p className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
                         <Phone className="h-4 w-4 shrink-0 text-primary" />
-                        <span className="text-primary">
-                          {item.contact_phone || "+91 70935 93568"}
-                        </span>{" "}
-                        <span className="font-normal">{item.contact_name || "ruttala ashok"}</span>
+                        <a href="tel:08932226982" className="text-primary hover:underline">
+                          {item.contact_phone || "08932-226982"}
+                        </a>
                       </p>
                     </div>
 
@@ -968,31 +1000,74 @@ function ArenaStories() {
 
                     <div className="mt-5 flex items-end justify-between border-t border-border pt-4">
                       <p>
-                        <span className="font-display text-3xl">₹{item.price_per_hour}</span>
-                        <span className="text-xs text-muted-foreground"> / hour</span>
-                      </p>
-                      <Button
-                        variant={venueId === item.id ? "sport" : "sportOutline"}
-                        onClick={() => {
-                          changeVenue(item.id);
-                          document.querySelector("#book")?.scrollIntoView({ behavior: "smooth" });
-                        }}
-                      >
-                        {venueId === item.id ? (
-                          <>
-                            <Check /> Selected
-                          </>
-                        ) : (
-                          <>
-                            Choose <ArrowRight />
-                          </>
+                        <span className="font-display text-3xl">
+                          {item.price_per_hour > 0 ? `₹${getStartingPrice(item)}` : "Pricing soon"}
+                        </span>
+                        {item.price_per_hour > 0 && (
+                          <span className="text-xs text-muted-foreground"> / hour</span>
                         )}
-                      </Button>
+                      </p>
+                      {item.booking_enabled ? (
+                        <Button
+                          variant={venueId === item.id ? "sport" : "sportOutline"}
+                          onClick={() => {
+                            changeVenue(item.id);
+                            document.querySelector("#book")?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                        >
+                          {venueId === item.id ? (
+                            <>
+                              <Check /> Selected
+                            </>
+                          ) : (
+                            <>
+                              <ArrowRight /> Choose
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <a
+                          href="tel:08932226982"
+                          className="text-sm font-bold text-primary hover:underline"
+                        >
+                          Call for pricing
+                        </a>
+                      )}
                     </div>
                   </div>
                 </article>
               ))}
             </div>
+            {venues.some((item) => item.name.includes("5400")) && (
+              <div className="mt-8 overflow-x-auto border border-border bg-card p-5">
+                <h3 className="font-display text-3xl">5,400 SQ. FT. HOURLY PRICES</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Your booking total adds the price of each selected hour.
+                </p>
+                <table className="mt-5 w-full min-w-[420px] text-left text-sm">
+                  <thead className="border-b border-border text-xs uppercase text-muted-foreground">
+                    <tr>
+                      <th className="py-3 pr-4">Time slot</th>
+                      <th className="py-3 pr-4">Walk-in booking</th>
+                      <th className="py-3 text-primary">Website booking</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {[
+                      { time: "6 AM – 10 AM", walkIn: 649, website: 599 },
+                      { time: "10 AM – 5 PM", walkIn: 549, website: 499 },
+                      { time: "5 PM – 6 AM", walkIn: 749, website: 699 },
+                    ].map((row) => (
+                      <tr key={row.time}>
+                        <td className="py-3 pr-4 font-semibold">{row.time}</td>
+                        <td className="py-3 pr-4">₹{row.walkIn}</td>
+                        <td className="py-3 font-bold text-primary">₹{row.website}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </section>
 
@@ -1005,15 +1080,15 @@ function ArenaStories() {
           <div className="relative min-h-[430px] overflow-hidden">
             <img
               src={actionImage}
-              alt="Cricket batsman playing a powerful shot inside an Arena Stories pitch"
+              alt="Cricket batsman playing a powerful shot inside a Stories Arena pitch"
               width={1408}
               height={912}
               loading="lazy"
               className="absolute inset-0 h-full w-full object-cover"
             />
             <div className="absolute inset-0 bg-[linear-gradient(0deg,oklch(0.10_0.03_155/0.65),transparent_60%)]" />
-            <p className="absolute bottom-8 left-8 font-display text-7xl text-primary">
-              NO EXCUSES.
+            <p className="absolute bottom-8 left-8 max-w-[90%] font-display text-4xl text-primary sm:text-5xl">
+              YOUR GAME. YOUR STORY. YOUR ARENA.
             </p>
           </div>
 
@@ -1022,19 +1097,19 @@ function ArenaStories() {
             <div>
               <p className="text-xs font-bold uppercase text-primary">Match-ready as standard</p>
               <h2 className="mt-4 max-w-xl font-display text-6xl leading-[0.9] sm:text-8xl">
-                EVERY DETAIL.
+                RESERVE THE TURF.
                 <br />
-                GAME DAY READY.
+                RULE THE GAME.
               </h2>
               <div className="mt-10 grid gap-px bg-surface-inverse-foreground/20 sm:grid-cols-2">
                 {(
                   [
-                    { icon: Sparkles, label: "Pro-grade pitch" },
-                    { icon: Zap, label: "Floodlit nights" },
-                    { icon: Clock3, label: "Open till midnight" },
-                    { icon: Trophy, label: "10-a-side matches" },
-                    { icon: Users, label: "Squad bookings" },
-                    { icon: ShieldCheck, label: "Safety checked" },
+                    { icon: Sparkles, label: "Unlimited Wi-Fi" },
+                    { icon: Zap, label: "Drinking water" },
+                    { icon: Clock3, label: "Open 24/7" },
+                    { icon: Trophy, label: "Washroom" },
+                    { icon: Users, label: "Music" },
+                    { icon: ShieldCheck, label: "Box cricket matches" },
                   ] satisfies { icon: LucideIcon; label: string }[]
                 ).map(({ icon: Icon, label }) => (
                   <div key={label} className="flex items-center gap-4 bg-surface-inverse p-5">
@@ -1083,10 +1158,22 @@ function ArenaStories() {
                 >
                   {venues.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} — ₹{item.price_per_hour}/hr
+                      {item.name} —{" "}
+                      {item.booking_enabled
+                        ? `from ₹${getStartingPrice(item)}/hr`
+                        : "call for pricing"}
                     </option>
                   ))}
                 </select>
+                {!venue.booking_enabled && (
+                  <p className="mt-3 border border-primary/30 bg-primary/10 p-3 text-sm">
+                    Full time-slot prices for this pitch are being confirmed. Call{" "}
+                    <a className="font-bold text-primary underline" href="tel:08932226982">
+                      08932-226982
+                    </a>{" "}
+                    to book it.
+                  </p>
+                )}
 
                 {/* Date navigation */}
                 <div className="mt-8 flex items-center justify-between">
@@ -1165,7 +1252,9 @@ function ArenaStories() {
                           className={`h-16 flex-col ${selected ? "ring-2 ring-primary ring-offset-2" : ""}`}
                           onClick={() => selectSlot(slot)}
                         >
-                          <span>{formatTime(slot.start_time)}</span>
+                          <span>
+                            {formatTime(slot.start_time)} · ₹{getHourPrice(venue, slot.start_time)}
+                          </span>
                           <span className="text-[10px] normal-case opacity-65">
                             {slot.status === "booked" || slot.reserved_count >= slot.capacity
                               ? "Booked"
@@ -1206,7 +1295,11 @@ function ArenaStories() {
                         {Array.from({ length: maxDuration }, (_, index) => index + 1).map(
                           (hours) => (
                             <option key={hours} value={hours}>
-                              {hours} hour{hours === 1 ? "" : "s"} — ₹{hours * venue.price_per_hour}
+                              {hours} hour{hours === 1 ? "" : "s"} — ₹
+                              {getBookingPrice(
+                                venue,
+                                activeSlots.slice(chosenSlotIndex, chosenSlotIndex + hours),
+                              )}
                             </option>
                           ),
                         )}
@@ -1439,7 +1532,9 @@ function ArenaStories() {
                     <div className="flex items-end justify-between py-6">
                       <span className="text-sm text-muted-foreground">Total</span>
                       <span className="font-display text-5xl">
-                        ₹{chosenSlot ? venue.price_per_hour * durationHours : venue.price_per_hour}
+                        {venue.booking_enabled
+                          ? `₹${chosenSlot ? selectedPrice : getStartingPrice(venue)}`
+                          : "Call for pricing"}
                       </span>
                     </div>
 
@@ -1447,16 +1542,23 @@ function ArenaStories() {
                       size="lg"
                       variant="sport"
                       className="as-glow w-full"
-                      disabled={submitting || !slotId || playerName.trim().length < 2}
+                      disabled={
+                        !venue.booking_enabled ||
+                        submitting ||
+                        !slotId ||
+                        playerName.trim().length < 2
+                      }
                       onClick={confirmBooking}
                     >
-                      {submitting
-                        ? "Opening secure payment…"
-                        : !slotId
-                          ? "Select a time slot"
-                          : playerName.trim().length < 2
-                            ? "Enter captain's name"
-                            : `Pay ₹${venue.price_per_hour * durationHours}`}{" "}
+                      {!venue.booking_enabled
+                        ? "Call for pricing to book this pitch"
+                        : submitting
+                          ? "Opening secure payment…"
+                          : !slotId
+                            ? "Select a time slot"
+                            : playerName.trim().length < 2
+                              ? "Enter captain's name"
+                              : `Pay ₹${selectedPrice}`}{" "}
                       <ArrowRight />
                     </Button>
 
@@ -1535,17 +1637,24 @@ function ArenaStories() {
               {/* Footer logo with crest */}
               <div className="flex items-center gap-3">
                 <BrandLogo size={40} glow={false} />
-                <p className="font-display text-4xl sm:text-5xl">
-                  <span className="brand-shimmer">ARENA</span>
-                  <span className="text-surface-inverse-foreground/80">//STORIES</span>
+                <p className="font-display text-3xl sm:text-5xl">
+                  <span className="brand-shimmer">STORIES</span>
+                  <span className="text-surface-inverse-foreground/80">//ARENA</span>
                 </p>
               </div>
               <p className="mt-2 text-sm text-surface-inverse-foreground/55">
-                Every match. A new story.
+                YOUR GAME. YOUR STORY. YOUR ARENA.
+              </p>
+              <p className="mt-3 max-w-xl text-sm text-surface-inverse-foreground/55">
+                Pedda Boddipalli, Vizag Road, opposite Royal Park Resort, behind Hanuman Coffee
+                Cafe, 531116 ·{" "}
+                <a href="tel:08932226982" className="hover:underline">
+                  08932-226982
+                </a>
               </p>
             </div>
             <div className="text-xs uppercase text-surface-inverse-foreground/45">
-              © 2026 Arena Stories · Bengaluru
+              © 2026 Stories Arena · Visakhapatnam
             </div>
           </div>
         </footer>
