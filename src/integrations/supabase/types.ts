@@ -15,6 +15,7 @@ export type Database = {
           created_at: string;
           customer_session_id: string | null;
           customer_email: string | null;
+          customer_phone: string | null;
           welcome_discount_amount: number;
           id: string;
           duration_hours: number;
@@ -35,6 +36,7 @@ export type Database = {
           created_at?: string;
           customer_session_id?: string | null;
           customer_email?: string | null;
+          customer_phone?: string | null;
           welcome_discount_amount?: number;
           id?: string;
           duration_hours?: number;
@@ -55,6 +57,7 @@ export type Database = {
           created_at?: string;
           customer_session_id?: string | null;
           customer_email?: string | null;
+          customer_phone?: string | null;
           welcome_discount_amount?: number;
           id?: string;
           duration_hours?: number;
@@ -268,7 +271,7 @@ export type Database = {
       reserve_booking_slots: {
         Args: {
           p_player_name: string;
-          p_customer_email: string;
+          p_customer_phone: string;
           p_payment_reference: string;
           p_customer_session_id: string;
           p_slot_ids: string[];

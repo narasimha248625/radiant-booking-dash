@@ -58,6 +58,7 @@ import {
 import heroImage from "@/assets/turf-hero.jpg";
 import arenaImage from "@/assets/arena-aerial.jpg";
 import actionImage from "@/assets/match-action.jpg";
+import bowlingMachineImage from "@/assets/bowling-machine.png";
 
 /* ─────────────────────────────────────────────────────────
    Route definition — data loader fetches venues + slots
@@ -105,7 +106,17 @@ const imageMap = {
   hero: heroImage,
   aerial: arenaImage,
   action: actionImage,
+  bowling: bowlingMachineImage,
 } as const;
+
+const ARENA_PHONE_DISPLAY = "+91 8932-226982";
+const ARENA_PHONE_HREF = "tel:+918932226982";
+
+const publicPriceBands = [
+  { time: "6 AM – 10 AM", walkIn: "walkin_price_morning", website: "price_morning" },
+  { time: "10 AM – 5 PM", walkIn: "walkin_price_day", website: "price_day" },
+  { time: "5 PM – 6 AM", walkIn: "walkin_price_night", website: "price_night" },
+] as const;
 
 type PaymentHistoryEntry = {
   bookingId: string;
@@ -233,9 +244,9 @@ function ArenaStories() {
   const [durationHours, setDurationHours] = useState(1);
   const [teamSize, setTeamSize] = useState(10);
   const [playerName, setPlayerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhoneDigits, setCustomerPhoneDigits] = useState("");
   const [welcomeEligibility, setWelcomeEligibility] = useState<{
-    email: string;
+    phone: string;
     eligible: boolean;
   } | null>(null);
   const [booking, setBooking] = useState<{
@@ -265,17 +276,17 @@ function ArenaStories() {
     upiVpa: string;
   } | null>(null);
 
-  const normalizedEmail = customerEmail.trim().toLowerCase();
-  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+  const normalizedPhone = `+91${customerPhoneDigits}`;
+  const validPhone = /^[6-9]\d{9}$/.test(customerPhoneDigits);
 
   useEffect(() => {
     setWelcomeEligibility(null);
-    if (!validEmail) return;
+    if (!validPhone) return;
     let active = true;
     const timer = window.setTimeout(async () => {
       try {
-        const result = await checkWelcomeOffer({ data: { customerEmail: normalizedEmail } });
-        if (active) setWelcomeEligibility({ email: normalizedEmail, eligible: result.eligible });
+        const result = await checkWelcomeOffer({ data: { customerPhone: normalizedPhone } });
+        if (active) setWelcomeEligibility({ phone: normalizedPhone, eligible: result.eligible });
       } catch {
         // The reservation transaction checks eligibility again before charging.
       }
@@ -286,8 +297,8 @@ function ArenaStories() {
     };
   }, [
     checkWelcomeOffer,
-    normalizedEmail,
-    validEmail,
+    normalizedPhone,
+    validPhone,
     upiPayment?.bookingId,
     booking?.booking_code,
   ]);
@@ -432,7 +443,7 @@ function ArenaStories() {
       : [];
   const selectedPrice = venue ? getBookingPrice(venue, selectedSlots) : 0;
   const welcomeDiscount =
-    welcomeEligibility?.email === normalizedEmail && welcomeEligibility.eligible
+    welcomeEligibility?.phone === normalizedPhone && welcomeEligibility.eligible
       ? getWelcomeDiscount(selectedPrice)
       : 0;
   const checkoutPrice = selectedPrice - welcomeDiscount;
@@ -508,9 +519,9 @@ function ArenaStories() {
       !venue.booking_enabled ||
       selectedSlots.length !== durationHours ||
       playerName.trim().length < 2 ||
-      !validEmail
+      !validPhone
     ) {
-      setError("Select a slot, enter the name on your UPI app, and add a valid email.");
+      setError("Select a slot, enter the name on your UPI app, and add a valid mobile number.");
       return;
     }
     setSubmitting(true);
@@ -527,7 +538,7 @@ function ArenaStories() {
             courtLabel: slot.court_label,
           })),
           playerName,
-          customerEmail: normalizedEmail,
+          customerPhone: normalizedPhone,
           teamSize,
           customerSessionId: getCustomerSessionId(),
         },
@@ -913,7 +924,7 @@ function ArenaStories() {
                     venue.booking_enabled
                       ? jumpToBooking
                       : () => {
-                          window.location.href = "tel:08932226982";
+                          window.location.href = ARENA_PHONE_HREF;
                         }
                   }
                 >
@@ -994,8 +1005,8 @@ function ArenaStories() {
                       </p>
                       <p className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
                         <Phone className="h-4 w-4 shrink-0 text-primary" />
-                        <a href="tel:08932226982" className="text-primary hover:underline">
-                          {item.contact_phone || "08932-226982"}
+                        <a href={ARENA_PHONE_HREF} className="text-primary hover:underline">
+                          {item.contact_phone || ARENA_PHONE_DISPLAY}
                         </a>
                       </p>
                     </div>
@@ -1040,7 +1051,7 @@ function ArenaStories() {
                         </Button>
                       ) : (
                         <a
-                          href="tel:08932226982"
+                          href={ARENA_PHONE_HREF}
                           className="text-sm font-bold text-primary hover:underline"
                         >
                           Call for pricing
@@ -1053,10 +1064,35 @@ function ArenaStories() {
             </div>
             <div className="mt-8 grid gap-5 lg:grid-cols-2">
               {venues.map((item) => (
-                <div key={item.id} className="overflow-x-auto border border-border bg-card p-5">
+                <div key={item.id} className="min-w-0 border border-border bg-card p-5">
                   <h3 className="font-display text-2xl">{item.name}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">Hourly prices by time period</p>
-                  <table className="mt-4 w-full min-w-[420px] text-left text-xs">
+                  <div className="mt-4 divide-y divide-border sm:hidden">
+                    {publicPriceBands.map((band) => {
+                      const walkIn = item[band.walkIn];
+                      const website = item[band.website];
+                      return (
+                        <div key={band.time} className="py-3 first:pt-0">
+                          <p className="mb-2 text-sm font-bold">{band.time}</p>
+                          <div className="grid grid-cols-3 gap-2 text-[11px]">
+                            <span>
+                              <span className="block text-muted-foreground">Walk-in</span>
+                              {walkIn === null ? "—" : `₹${walkIn}`}
+                            </span>
+                            <span>
+                              <span className="block text-muted-foreground">Website</span>
+                              {website === null ? "—" : `₹${website}`}
+                            </span>
+                            <span className="font-bold text-primary">
+                              <span className="block">First booking*</span>
+                              {website === null ? "—" : `₹${website - getWelcomeDiscount(website)}`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <table className="mt-4 hidden w-full text-left text-xs sm:table">
                     <thead className="border-b border-border uppercase text-muted-foreground">
                       <tr>
                         <th className="py-3 pr-2">Time</th>
@@ -1066,35 +1102,19 @@ function ArenaStories() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {[
-                        {
-                          time: "6 AM – 10 AM",
-                          walkIn: item.walkin_price_morning,
-                          website: item.price_morning,
-                        },
-                        {
-                          time: "10 AM – 5 PM",
-                          walkIn: item.walkin_price_day,
-                          website: item.price_day,
-                        },
-                        {
-                          time: "5 PM – 6 AM",
-                          walkIn: item.walkin_price_night,
-                          website: item.price_night,
-                        },
-                      ].map((row) => (
-                        <tr key={row.time}>
-                          <td className="py-3 pr-2 font-semibold">{row.time}</td>
+                      {publicPriceBands.map((band) => (
+                        <tr key={band.time}>
+                          <td className="py-3 pr-2 font-semibold">{band.time}</td>
                           <td className="py-3 pr-2">
-                            {row.walkIn === null ? "—" : `₹${row.walkIn}`}
+                            {item[band.walkIn] === null ? "—" : `₹${item[band.walkIn]}`}
                           </td>
                           <td className="py-3 pr-2">
-                            {row.website === null ? "—" : `₹${row.website}`}
+                            {item[band.website] === null ? "—" : `₹${item[band.website]}`}
                           </td>
                           <td className="py-3 font-bold text-primary">
-                            {row.website === null
+                            {item[band.website] === null
                               ? "—"
-                              : `₹${row.website - getWelcomeDiscount(row.website)}`}
+                              : `₹${item[band.website]! - getWelcomeDiscount(item[band.website]!)}`}
                           </td>
                         </tr>
                       ))}
@@ -1104,7 +1124,7 @@ function ArenaStories() {
               ))}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              *₹150 off the first website booking per email address. The welcome discount is applied
+              *₹150 off the first website booking per mobile number. The welcome discount is applied
               once to the whole booking, even when you book multiple hours. A dash means the court
               price has not been set yet.
             </p>
@@ -1170,7 +1190,7 @@ function ArenaStories() {
           <div className="mx-auto max-w-7xl">
             <SectionTitle number="02" kicker="Live booking" title="LOCK IN YOUR MATCH." />
 
-            <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.7fr)]">
+            <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.7fr)]">
               {/* ── Left: booking form ── */}
               <div className="min-w-0">
                 {/* Step progress bar */}
@@ -1198,18 +1218,15 @@ function ArenaStories() {
                 >
                   {venues.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name} —{" "}
-                      {item.booking_enabled
-                        ? `from ₹${getStartingPrice(item)}/hr`
-                        : "call for pricing"}
+                      {item.name}
                     </option>
                   ))}
                 </select>
                 {!venue.booking_enabled && (
                   <p className="mt-3 border border-primary/30 bg-primary/10 p-3 text-sm">
                     Full time-slot prices for this pitch are being confirmed. Call{" "}
-                    <a className="font-bold text-primary underline" href="tel:08932226982">
-                      08932-226982
+                    <a className="font-bold text-primary underline" href={ARENA_PHONE_HREF}>
+                      {ARENA_PHONE_DISPLAY}
                     </a>{" "}
                     to book it.
                   </p>
@@ -1253,11 +1270,11 @@ function ArenaStories() {
                             {formatTime(slot.start_time)}
                             {venue.booking_enabled
                               ? ` · ₹${getHourPrice(venue, slot.start_time)}`
-                              : " · Call for price"}
+                              : ""}
                           </span>
                           <span className="text-[10px] normal-case opacity-65">
                             {!venue.booking_enabled
-                              ? "Call to book"
+                              ? "Call for price"
                               : slot.status === "booked" || slot.reserved_count >= slot.capacity
                                 ? "Booked"
                                 : slot.status === "held"
@@ -1360,29 +1377,38 @@ function ArenaStories() {
 
                 <div className="mt-4">
                   <label
-                    htmlFor="customer-email"
+                    htmlFor="customer-phone"
                     className="text-xs font-bold uppercase text-muted-foreground"
                   >
-                    Email address
+                    Mobile number
                   </label>
-                  <input
-                    id="customer-email"
-                    type="email"
-                    value={customerEmail}
-                    onChange={(event) => setCustomerEmail(event.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    required
-                    className="mt-2 h-12 w-full border border-input bg-background px-4 outline-hidden placeholder:text-muted-foreground focus:border-primary"
-                  />
+                  <div className="mt-2 flex h-12 min-w-0 border border-input bg-background focus-within:border-primary">
+                    <span className="flex shrink-0 items-center border-r border-input px-3 font-semibold">
+                      +91
+                    </span>
+                    <input
+                      id="customer-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      value={customerPhoneDigits}
+                      onChange={(event) =>
+                        setCustomerPhoneDigits(event.target.value.replace(/\D/g, "").slice(0, 10))
+                      }
+                      placeholder="10-digit mobile number"
+                      autoComplete="tel-national"
+                      maxLength={10}
+                      required
+                      className="min-w-0 flex-1 bg-transparent px-4 outline-hidden placeholder:text-muted-foreground"
+                    />
+                  </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Your first website booking with this email gets ₹150 off the total.
+                    Your first website booking with this mobile number gets ₹150 off the total.
                   </p>
-                  {validEmail && welcomeEligibility?.email === normalizedEmail && (
+                  {validPhone && welcomeEligibility?.phone === normalizedPhone && (
                     <p className="mt-1 text-xs font-semibold text-primary">
                       {welcomeEligibility.eligible
-                        ? "Welcome offer available for this email."
-                        : "Welcome offer already used or reserved for this email."}
+                        ? "Welcome offer available for this number."
+                        : "Welcome offer already used or reserved for this number."}
                     </p>
                   )}
                 </div>
@@ -1401,7 +1427,7 @@ function ArenaStories() {
               {/* ── Right: summary + confirmation panel ── */}
               <aside
                 id="status"
-                className="self-start border border-border bg-card p-6 lg:sticky lg:top-24"
+                className="min-w-0 self-start border border-border bg-card p-5 sm:p-6 lg:sticky lg:top-24"
               >
                 {booking ? (
                   /* ── Booking confirmed state ── */
@@ -1595,7 +1621,7 @@ function ArenaStories() {
                         submitting ||
                         !slotId ||
                         playerName.trim().length < 2 ||
-                        !validEmail
+                        !validPhone
                       }
                       onClick={confirmBooking}
                     >
@@ -1607,15 +1633,15 @@ function ArenaStories() {
                             ? "Select a time slot"
                             : playerName.trim().length < 2
                               ? "Enter the name on your UPI app"
-                              : !validEmail
-                                ? "Enter a valid email"
+                              : !validPhone
+                                ? "Enter a valid mobile number"
                                 : `Pay ₹${checkoutPrice}`}{" "}
                       <ArrowRight />
                     </Button>
 
-                    {(!slotId || playerName.trim().length < 2 || !validEmail) && (
+                    {(!slotId || playerName.trim().length < 2 || !validPhone) && (
                       <p className="mt-3 text-center text-xs text-muted-foreground">
-                        Select a slot, enter the name on your UPI app, and add your email to
+                        Select a slot, enter the name on your UPI app, and add your mobile number to
                         continue to payment.
                       </p>
                     )}
@@ -1705,8 +1731,8 @@ function ArenaStories() {
               <p className="mt-3 max-w-xl text-sm text-surface-inverse-foreground/55">
                 Pedda Boddipalli, Vizag Road, opposite Royal Park Resort, behind Hanuman Coffee
                 Cafe, 531116 ·{" "}
-                <a href="tel:08932226982" className="hover:underline">
-                  08932-226982
+                <a href={ARENA_PHONE_HREF} className="hover:underline">
+                  {ARENA_PHONE_DISPLAY}
                 </a>
               </p>
             </div>

@@ -18,7 +18,7 @@ const paymentSelectionSchema = z.object({
 
   playerName: z.string().trim().min(2).max(80),
 
-  customerEmail: z.string().trim().toLowerCase().email().max(254),
+  customerPhone: z.string().regex(/^\+91[6-9]\d{9}$/),
 
   teamSize: z.number().int().min(1).max(22),
 
@@ -50,7 +50,7 @@ const bookingStatusSchema = z.object({
 });
 
 const welcomeOfferSchema = z.object({
-  customerEmail: z.string().trim().toLowerCase().email().max(254),
+  customerPhone: z.string().regex(/^\+91[6-9]\d{9}$/),
 });
 
 function indiaDate(date = new Date()) {
@@ -205,7 +205,7 @@ export const getTurfData = createServerFn({
   const transformedVenues = (venues ?? []).map((venue) => ({
     ...venue,
     booking_enabled: venue.booking_enabled ?? true,
-    contact_phone: "08932-226982",
+    contact_phone: "+91 8932-226982",
   }));
 
   const availableSlots =
@@ -232,7 +232,7 @@ export const getWelcomeOfferEligibility = createServerFn({ method: "POST" })
     const { data: booking, error } = await supabaseAdmin
       .from("bookings")
       .select("id")
-      .eq("customer_email", data.customerEmail)
+      .eq("customer_phone", data.customerPhone)
       .gt("welcome_discount_amount", 0)
       .in("status", ["pending", "confirmed"])
       .in("payment_status", ["pending", "submitted", "paid"])
@@ -348,7 +348,7 @@ export const createUpiPaymentRequest = createServerFn({
 
           p_player_name: data.playerName,
 
-          p_customer_email: data.customerEmail,
+          p_customer_phone: data.customerPhone,
 
           p_team_size: data.teamSize,
 

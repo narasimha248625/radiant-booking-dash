@@ -515,7 +515,7 @@ function AdminPanel() {
                       <TableHeader className="bg-zinc-950 sticky top-0 z-10">
                         <TableRow className="border-zinc-800 hover:bg-zinc-950/50">
                           <TableHead className="text-zinc-400">Code</TableHead>
-                          <TableHead className="text-zinc-400">UPI name / Email</TableHead>
+                          <TableHead className="text-zinc-400">UPI name / Mobile</TableHead>
                           <TableHead className="text-zinc-400">Venue</TableHead>
                           <TableHead className="text-zinc-400">Date & Time</TableHead>
                           <TableHead className="text-zinc-400">Duration</TableHead>
@@ -538,9 +538,9 @@ function AdminPanel() {
                             </TableCell>
                             <TableCell className="text-zinc-300">
                               {booking.player_name}
-                              {booking.customer_email && (
+                              {booking.customer_phone && (
                                 <span className="block text-xs text-zinc-400">
-                                  {booking.customer_email}
+                                  {booking.customer_phone}
                                 </span>
                               )}
                             </TableCell>
