@@ -904,18 +904,34 @@ function ArenaStories() {
 
               {/* Price + CTA */}
               <div className="mt-6 flex items-end justify-between gap-4 border-t border-hero-foreground/15 pt-5">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase text-hero-muted">From</p>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase text-hero-muted">
+                    {chosenSlot ? "Selected hour" : "Rates from"}
+                  </p>
                   <p className="font-display text-3xl">
                     {venue.booking_enabled
-                      ? `₹${getStartingPrice(venue)}`
+                      ? `₹${chosenSlot ? getHourPrice(venue, chosenSlot.start_time) : getStartingPrice(venue)}`
                       : venue.price_per_hour > 0
                         ? `₹${getStartingPrice(venue)}`
                         : "Price on request"}
                     {venue.booking_enabled && (
-                      <span className="font-sans text-xs text-hero-muted"> / hour</span>
+                      <span className="font-sans text-xs text-hero-muted"> / hour regular</span>
                     )}
                   </p>
+                  {venue.booking_enabled && (
+                    <p className="mt-1 text-xs text-hero-muted">
+                      ₹
+                      {(chosenSlot
+                        ? getHourPrice(venue, chosenSlot.start_time)
+                        : getStartingPrice(venue)) -
+                        getWelcomeDiscount(
+                          chosenSlot
+                            ? getHourPrice(venue, chosenSlot.start_time)
+                            : getStartingPrice(venue),
+                        )}{" "}
+                      for a first booking*
+                    </p>
+                  )}
                 </div>
                 <Button
                   size="lg"
@@ -1028,7 +1044,7 @@ function ArenaStories() {
                           {item.price_per_hour > 0 ? `₹${getStartingPrice(item)}` : "Pricing soon"}
                         </span>
                         {item.price_per_hour > 0 && (
-                          <span className="text-xs text-muted-foreground"> / hour</span>
+                          <span className="text-xs text-muted-foreground"> / hour regular</span>
                         )}
                       </p>
                       {item.booking_enabled ? (
@@ -1076,16 +1092,18 @@ function ArenaStories() {
                           <p className="mb-2 text-sm font-bold">{band.time}</p>
                           <div className="grid grid-cols-3 gap-2 text-[11px]">
                             <span>
-                              <span className="block text-muted-foreground">Walk-in</span>
-                              {walkIn === null ? "—" : `₹${walkIn}`}
-                            </span>
-                            <span>
-                              <span className="block text-muted-foreground">Website</span>
+                              <span className="block text-muted-foreground">Original</span>
                               {website === null ? "—" : `₹${website}`}
                             </span>
+                            <span>
+                              <span className="block text-muted-foreground">Instagram</span>
+                              {walkIn === null ? "—" : `₹${walkIn}`}
+                            </span>
                             <span className="font-bold text-primary">
-                              <span className="block">First booking*</span>
-                              {website === null ? "—" : `₹${website - getWelcomeDiscount(website)}`}
+                              <span className="block">Website first*</span>
+                              {website === null || !item.booking_enabled
+                                ? "—"
+                                : `₹${website - getWelcomeDiscount(website)}`}
                             </span>
                           </div>
                         </div>
@@ -1096,9 +1114,9 @@ function ArenaStories() {
                     <thead className="border-b border-border uppercase text-muted-foreground">
                       <tr>
                         <th className="py-3 pr-2">Time</th>
-                        <th className="py-3 pr-2">Walk-in</th>
-                        <th className="py-3 pr-2">Website</th>
-                        <th className="py-3 text-primary">First booking*</th>
+                        <th className="py-3 pr-2">Original / repeat</th>
+                        <th className="py-3 pr-2">Instagram</th>
+                        <th className="py-3 text-primary">Website first*</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -1106,13 +1124,13 @@ function ArenaStories() {
                         <tr key={band.time}>
                           <td className="py-3 pr-2 font-semibold">{band.time}</td>
                           <td className="py-3 pr-2">
-                            {item[band.walkIn] === null ? "—" : `₹${item[band.walkIn]}`}
-                          </td>
-                          <td className="py-3 pr-2">
                             {item[band.website] === null ? "—" : `₹${item[band.website]}`}
                           </td>
+                          <td className="py-3 pr-2">
+                            {item[band.walkIn] === null ? "—" : `₹${item[band.walkIn]}`}
+                          </td>
                           <td className="py-3 font-bold text-primary">
-                            {item[band.website] === null
+                            {item[band.website] === null || !item.booking_enabled
                               ? "—"
                               : `₹${item[band.website]! - getWelcomeDiscount(item[band.website]!)}`}
                           </td>
@@ -1124,9 +1142,10 @@ function ArenaStories() {
               ))}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              *₹150 off the first website booking per mobile number. The welcome discount is applied
-              once to the whole booking, even when you book multiple hours. A dash means the court
-              price has not been set yet.
+              *₹150 off the first website booking per mobile number. The website prices above show
+              one hour with that offer. Repeat bookings use the original rates. For multiple hours,
+              ₹150 is deducted once from the total. Instagram rates are for Instagram followers. A
+              dash means online booking or that rate is unavailable.
             </p>
           </div>
         </section>
@@ -1269,7 +1288,7 @@ function ArenaStories() {
                           <span>
                             {formatTime(slot.start_time)}
                             {venue.booking_enabled
-                              ? ` · ₹${getHourPrice(venue, slot.start_time)}`
+                              ? ` · ₹${getHourPrice(venue, slot.start_time)} regular`
                               : ""}
                           </span>
                           <span className="text-[10px] normal-case opacity-65">
@@ -1281,9 +1300,13 @@ function ArenaStories() {
                                   ? "Booked — approval pending"
                                   : slot.status === "limited"
                                     ? "Limited availability"
-                                    : selected
-                                      ? "Selected"
-                                      : "Available"}
+                                    : validPhone &&
+                                        welcomeEligibility?.phone === normalizedPhone &&
+                                        !welcomeEligibility.eligible
+                                      ? selected
+                                        ? "Selected"
+                                        : "Available"
+                                      : `₹${getHourPrice(venue, slot.start_time) - getWelcomeDiscount(getHourPrice(venue, slot.start_time))} first booking*`}
                           </span>
                         </Button>
                       );
@@ -1407,8 +1430,8 @@ function ArenaStories() {
                   {validPhone && welcomeEligibility?.phone === normalizedPhone && (
                     <p className="mt-1 text-xs font-semibold text-primary">
                       {welcomeEligibility.eligible
-                        ? "Welcome offer available for this number."
-                        : "Welcome offer already used or reserved for this number."}
+                        ? "This number is eligible: ₹150 off your first booking."
+                        : "This number has been used already. ₹150 first-booking discount is unavailable; regular rates apply."}
                     </p>
                   )}
                 </div>

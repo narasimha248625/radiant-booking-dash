@@ -448,7 +448,7 @@ function AdminPanel() {
   }
 
   return (
-    <div className="relative h-screen overflow-hidden bg-hero text-white p-6 flex flex-col">
+    <div className="relative min-h-[100dvh] overflow-x-hidden bg-hero p-3 text-white sm:p-6 lg:h-[100dvh] lg:overflow-hidden flex flex-col">
       <img
         src={heroImage}
         alt="Hero Background"
@@ -456,9 +456,9 @@ function AdminPanel() {
       />
       <div className="hero-scrim absolute inset-0" />
       <div className="relative z-10 w-full max-w-6xl mx-auto flex-1 flex flex-col min-h-0 space-y-4">
-        <div className="flex justify-between items-center shrink-0">
+        <div className="flex flex-wrap justify-between items-center gap-3 shrink-0">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-md">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white drop-shadow-md">
               Admin Dashboard
             </h1>
             <p className="text-zinc-300 mt-1 drop-shadow-md">Manage turfs, bookings, and users.</p>
@@ -472,8 +472,8 @@ function AdminPanel() {
           </Button>
         </div>
 
-        <Tabs defaultValue="bookings" className="w-full flex-1 flex flex-col min-h-0">
-          <TabsList className="mb-4 max-w-full shrink-0 justify-start overflow-x-auto border border-zinc-800 bg-zinc-900">
+        <Tabs defaultValue="bookings" className="w-full min-w-0 flex-1 flex flex-col min-h-0">
+          <TabsList className="mb-4 grid h-auto w-full shrink-0 grid-cols-2 gap-1 border border-zinc-800 bg-zinc-900 p-1 sm:flex sm:w-fit">
             <TabsTrigger
               value="bookings"
               className="data-[state=active]:bg-zinc-800 data-[state=active]:text-white"
@@ -500,7 +500,10 @@ function AdminPanel() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="bookings" className="space-y-4 mt-0">
+          <TabsContent
+            value="bookings"
+            className="mt-0 min-w-0 space-y-4 lg:min-h-0 lg:overflow-y-auto"
+          >
             <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl">
               <CardHeader>
                 <CardTitle className="text-white">Recent Bookings</CardTitle>
@@ -510,122 +513,227 @@ function AdminPanel() {
               </CardHeader>
               <CardContent>
                 {bookings.length > 0 ? (
-                  <div className="rounded-md border border-zinc-800 overflow-y-auto max-h-[600px]">
-                    <Table>
-                      <TableHeader className="bg-zinc-950 sticky top-0 z-10">
-                        <TableRow className="border-zinc-800 hover:bg-zinc-950/50">
-                          <TableHead className="text-zinc-400">Code</TableHead>
-                          <TableHead className="text-zinc-400">UPI name / Mobile</TableHead>
-                          <TableHead className="text-zinc-400">Venue</TableHead>
-                          <TableHead className="text-zinc-400">Date & Time</TableHead>
-                          <TableHead className="text-zinc-400">Duration</TableHead>
-                          <TableHead className="text-zinc-400">Team Size</TableHead>
-                          <TableHead className="text-zinc-400">Payment</TableHead>
-                          <TableHead className="text-zinc-400">UPI UTR</TableHead>
-                          <TableHead className="text-zinc-400">Booking</TableHead>
-                          <TableHead className="text-right text-zinc-400">Amount</TableHead>
-                          <TableHead className="text-right text-zinc-400">Review</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {bookings.map((booking) => (
-                          <TableRow
-                            key={booking.id}
-                            className="border-zinc-800 hover:bg-zinc-800/50"
-                          >
-                            <TableCell className="font-medium text-white">
-                              {booking.booking_code}
-                            </TableCell>
-                            <TableCell className="text-zinc-300">
-                              {booking.player_name}
+                  <>
+                    <div className="space-y-3 md:hidden">
+                      {bookings.map((booking) => (
+                        <div
+                          key={booking.id}
+                          className="min-w-0 space-y-3 rounded-md border border-zinc-700 bg-zinc-950/70 p-4 text-sm"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <p className="font-bold text-white">{booking.booking_code}</p>
+                              <p className="text-zinc-300">{booking.player_name}</p>
                               {booking.customer_phone && (
-                                <span className="block text-xs text-zinc-400">
-                                  {booking.customer_phone}
-                                </span>
+                                <p className="text-zinc-400">{booking.customer_phone}</p>
                               )}
-                            </TableCell>
-                            <TableCell className="text-zinc-300">
-                              {booking.venues?.name || "Unknown"}
-                            </TableCell>
-                            <TableCell className="text-zinc-300">
-                              <div className="space-y-1">
-                                {(
-                                  booking.booking_slots
-                                    ?.flatMap((linked) => (linked.slots ? [linked.slots] : []))
-                                    .sort(
-                                      (left, right) =>
-                                        left.slot_date.localeCompare(right.slot_date) ||
-                                        left.start_time.localeCompare(right.start_time),
-                                    ) ?? []
-                                ).map((slot) => (
-                                  <p
-                                    key={`${slot.slot_date}-${slot.start_time}-${slot.court_label}`}
-                                  >
-                                    {slot.slot_date} {slot.start_time.slice(0, 5)} ·{" "}
-                                    {slot.court_label}
-                                  </p>
-                                ))}
-                                {!booking.booking_slots?.length && booking.slots && (
-                                  <p>
-                                    {booking.slots.slot_date} {booking.slots.start_time.slice(0, 5)}
-                                  </p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-zinc-300">
-                              {booking.duration_hours || 1} hr
-                              {(booking.duration_hours || 1) === 1 ? "" : "s"}
-                            </TableCell>
-                            <TableCell className="text-zinc-300">{booking.team_size}</TableCell>
-                            <TableCell
-                              className={
-                                booking.payment_status === "paid"
-                                  ? "font-semibold text-[#00D084]"
-                                  : "text-amber-400"
-                              }
-                            >
-                              {booking.payment_status || "unknown"}
-                            </TableCell>
-                            <TableCell className="font-mono text-xs text-zinc-300">
-                              {booking.upi_transaction_id || "—"}
-                            </TableCell>
-                            <TableCell className="text-zinc-300">{booking.status}</TableCell>
-                            <TableCell className="text-right text-[#00D084]">
-                              ₹{booking.amount}
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-[#00D084]">₹{booking.amount}</p>
                               {booking.welcome_discount_amount > 0 && (
-                                <span className="block text-xs text-zinc-400">
+                                <p className="text-xs text-zinc-400">
                                   ₹{booking.welcome_discount_amount} welcome off
-                                </span>
+                                </p>
                               )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {booking.payment_status === "submitted" ? (
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    size="sm"
-                                    className="bg-[#00D084] text-black hover:bg-[#00D084]/90"
-                                    onClick={() => handleReviewPayment(booking.id, true)}
-                                  >
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-red-500/60 text-red-300 hover:bg-red-950"
-                                    onClick={() => handleReviewPayment(booking.id, false)}
-                                  >
-                                    Reject
-                                  </Button>
-                                </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                            <div className="col-span-2">
+                              <span className="text-zinc-400">Pitch</span>
+                              <p className="break-words text-zinc-200">
+                                {booking.venues?.name || "Unknown"}
+                              </p>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-zinc-400">Date & time</span>
+                              {booking.booking_slots?.length ? (
+                                booking.booking_slots
+                                  .flatMap((linked) => (linked.slots ? [linked.slots] : []))
+                                  .sort(
+                                    (left, right) =>
+                                      left.slot_date.localeCompare(right.slot_date) ||
+                                      left.start_time.localeCompare(right.start_time),
+                                  )
+                                  .map((slot) => (
+                                    <p
+                                      key={`${slot.slot_date}-${slot.start_time}`}
+                                      className="text-zinc-200"
+                                    >
+                                      {slot.slot_date} {slot.start_time.slice(0, 5)} ·{" "}
+                                      {slot.court_label}
+                                    </p>
+                                  ))
                               ) : (
-                                <span className="text-zinc-600">—</span>
+                                <p className="text-zinc-200">
+                                  {booking.slots
+                                    ? `${booking.slots.slot_date} ${booking.slots.start_time.slice(0, 5)}`
+                                    : "—"}
+                                </p>
                               )}
-                            </TableCell>
+                            </div>
+                            <div>
+                              <span className="text-zinc-400">Duration</span>
+                              <p className="text-zinc-200">{booking.duration_hours || 1} hr</p>
+                            </div>
+                            <div>
+                              <span className="text-zinc-400">Team size</span>
+                              <p className="text-zinc-200">{booking.team_size}</p>
+                            </div>
+                            <div>
+                              <span className="text-zinc-400">Payment</span>
+                              <p className="text-zinc-200">{booking.payment_status || "unknown"}</p>
+                            </div>
+                            <div>
+                              <span className="text-zinc-400">Booking</span>
+                              <p className="text-zinc-200">{booking.status}</p>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-zinc-400">UPI UTR</span>
+                              <p className="break-all font-mono text-zinc-200">
+                                {booking.upi_transaction_id || "—"}
+                              </p>
+                            </div>
+                          </div>
+                          {booking.payment_status === "submitted" && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button
+                                size="sm"
+                                className="bg-[#00D084] text-black hover:bg-[#00D084]/90"
+                                onClick={() => handleReviewPayment(booking.id, true)}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-500/60 text-red-300 hover:bg-red-950"
+                                onClick={() => handleReviewPayment(booking.id, false)}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="hidden max-h-[600px] max-w-full overflow-auto rounded-md border border-zinc-800 md:block">
+                      <Table>
+                        <TableHeader className="bg-zinc-950 sticky top-0 z-10">
+                          <TableRow className="border-zinc-800 hover:bg-zinc-950/50">
+                            <TableHead className="text-zinc-400">Code</TableHead>
+                            <TableHead className="text-zinc-400">UPI name / Mobile</TableHead>
+                            <TableHead className="text-zinc-400">Venue</TableHead>
+                            <TableHead className="text-zinc-400">Date & Time</TableHead>
+                            <TableHead className="text-zinc-400">Duration</TableHead>
+                            <TableHead className="text-zinc-400">Team Size</TableHead>
+                            <TableHead className="text-zinc-400">Payment</TableHead>
+                            <TableHead className="text-zinc-400">UPI UTR</TableHead>
+                            <TableHead className="text-zinc-400">Booking</TableHead>
+                            <TableHead className="text-right text-zinc-400">Amount</TableHead>
+                            <TableHead className="text-right text-zinc-400">Review</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        </TableHeader>
+                        <TableBody>
+                          {bookings.map((booking) => (
+                            <TableRow
+                              key={booking.id}
+                              className="border-zinc-800 hover:bg-zinc-800/50"
+                            >
+                              <TableCell className="font-medium text-white">
+                                {booking.booking_code}
+                              </TableCell>
+                              <TableCell className="text-zinc-300">
+                                {booking.player_name}
+                                {booking.customer_phone && (
+                                  <span className="block text-xs text-zinc-400">
+                                    {booking.customer_phone}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-zinc-300">
+                                {booking.venues?.name || "Unknown"}
+                              </TableCell>
+                              <TableCell className="text-zinc-300">
+                                <div className="space-y-1">
+                                  {(
+                                    booking.booking_slots
+                                      ?.flatMap((linked) => (linked.slots ? [linked.slots] : []))
+                                      .sort(
+                                        (left, right) =>
+                                          left.slot_date.localeCompare(right.slot_date) ||
+                                          left.start_time.localeCompare(right.start_time),
+                                      ) ?? []
+                                  ).map((slot) => (
+                                    <p
+                                      key={`${slot.slot_date}-${slot.start_time}-${slot.court_label}`}
+                                    >
+                                      {slot.slot_date} {slot.start_time.slice(0, 5)} ·{" "}
+                                      {slot.court_label}
+                                    </p>
+                                  ))}
+                                  {!booking.booking_slots?.length && booking.slots && (
+                                    <p>
+                                      {booking.slots.slot_date}{" "}
+                                      {booking.slots.start_time.slice(0, 5)}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-zinc-300">
+                                {booking.duration_hours || 1} hr
+                                {(booking.duration_hours || 1) === 1 ? "" : "s"}
+                              </TableCell>
+                              <TableCell className="text-zinc-300">{booking.team_size}</TableCell>
+                              <TableCell
+                                className={
+                                  booking.payment_status === "paid"
+                                    ? "font-semibold text-[#00D084]"
+                                    : "text-amber-400"
+                                }
+                              >
+                                {booking.payment_status || "unknown"}
+                              </TableCell>
+                              <TableCell className="font-mono text-xs text-zinc-300">
+                                {booking.upi_transaction_id || "—"}
+                              </TableCell>
+                              <TableCell className="text-zinc-300">{booking.status}</TableCell>
+                              <TableCell className="text-right text-[#00D084]">
+                                ₹{booking.amount}
+                                {booking.welcome_discount_amount > 0 && (
+                                  <span className="block text-xs text-zinc-400">
+                                    ₹{booking.welcome_discount_amount} welcome off
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {booking.payment_status === "submitted" ? (
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      size="sm"
+                                      className="bg-[#00D084] text-black hover:bg-[#00D084]/90"
+                                      onClick={() => handleReviewPayment(booking.id, true)}
+                                    >
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-500/60 text-red-300 hover:bg-red-950"
+                                      onClick={() => handleReviewPayment(booking.id, false)}
+                                    >
+                                      Reject
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <span className="text-zinc-600">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 ) : (
                   <div className="text-center py-8 text-zinc-500">No bookings found.</div>
                 )}
@@ -633,9 +741,12 @@ function AdminPanel() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="turfs" className="flex-1 min-h-0 mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-0">
-              <div className="md:col-span-1 h-full overflow-y-auto pr-2 pb-2">
+          <TabsContent
+            value="turfs"
+            className="mt-0 min-w-0 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+          >
+            <div className="grid grid-cols-1 gap-4 pb-4 lg:grid-cols-3 lg:gap-6 lg:h-full lg:min-h-0">
+              <div className="min-w-0 lg:col-span-1 lg:h-full lg:overflow-y-auto lg:pr-2 pb-2">
                 <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl">
                   <CardHeader>
                     <CardTitle className="text-white">
@@ -688,11 +799,11 @@ function AdminPanel() {
                             setNewVenue({ ...newVenue, price_per_hour: Number(e.target.value) })
                           }
                           className="bg-zinc-800 border-zinc-700 text-white"
-                          placeholder="499"
+                          placeholder="649"
                           required
                         />
                         <p className="text-xs text-zinc-400">
-                          Scheduled morning, daytime, and night prices override this base price.
+                          Scheduled original rates override this fallback price.
                         </p>
                       </div>
                       <div className="space-y-2">
@@ -735,13 +846,13 @@ function AdminPanel() {
                 </Card>
               </div>
 
-              <div className="md:col-span-2 h-full min-h-0">
+              <div className="min-w-0 lg:col-span-2 lg:h-full lg:min-h-0">
                 <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl h-full flex flex-col">
                   <CardHeader className="shrink-0">
                     <CardTitle className="text-white">Existing Turfs</CardTitle>
                   </CardHeader>
-                  <CardContent className="flex-1 min-h-0 overflow-hidden pb-6">
-                    <div className="rounded-md border border-zinc-800 h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
+                  <CardContent className="min-w-0 flex-1 min-h-0 pb-6">
+                    <div className="max-w-full rounded-md border border-zinc-800 lg:h-full overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
                       <Table>
                         <TableHeader className="bg-zinc-950 sticky top-0 z-10 shadow-md">
                           <TableRow className="border-zinc-800 hover:bg-zinc-950/50">
@@ -802,7 +913,10 @@ function AdminPanel() {
             </div>
           </TabsContent>
 
-          <TabsContent value="pricing" className="mt-0 min-h-0 flex-1 overflow-y-auto pb-6">
+          <TabsContent
+            value="pricing"
+            className="mt-0 min-w-0 pb-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+          >
             <div className="grid gap-5">
               {venues.map((venue) => {
                 const draft = pricingDrafts[venue.id] ?? pricingDraft(venue);
@@ -816,16 +930,17 @@ function AdminPanel() {
                     <CardHeader>
                       <CardTitle>{venue.name}</CardTitle>
                       <CardDescription className="text-zinc-400">
-                        Save website and walk-in prices for each one-hour period. The three website
-                        rates enable online booking for this pitch.
+                        Set the original rate charged for repeat website bookings and the Instagram
+                        follower rate for each hour. A first website booking gets ₹150 off its
+                        total.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-3">
                         <div className="hidden grid-cols-[minmax(120px,1fr)_minmax(120px,1fr)_minmax(120px,1fr)] gap-3 text-xs font-bold uppercase text-zinc-400 sm:grid">
                           <span>Time period</span>
-                          <span>Website / hour</span>
-                          <span>Walk-in / hour</span>
+                          <span>Original / repeat</span>
+                          <span>Instagram / hour</span>
                         </div>
                         {priceBands.map((band) => (
                           <div
@@ -841,8 +956,8 @@ function AdminPanel() {
                                     htmlFor={`${venue.id}-${field}`}
                                     className="text-xs text-zinc-400 sm:sr-only"
                                   >
-                                    {kind === "website" ? "Website" : "Walk-in"} price for{" "}
-                                    {band.label}
+                                    {kind === "website" ? "Original / repeat" : "Instagram"} price
+                                    for {band.label}
                                   </Label>
                                   <Input
                                     id={`${venue.id}-${field}`}
@@ -876,7 +991,7 @@ function AdminPanel() {
                         <p className="text-xs text-zinc-400">
                           {websiteReady
                             ? "Online booking will be available after saving."
-                            : "Enter all three website prices to enable online booking."}
+                            : "Enter all three original prices to enable online booking."}
                         </p>
                         <Button
                           type="button"
@@ -894,9 +1009,12 @@ function AdminPanel() {
             </div>
           </TabsContent>
 
-          <TabsContent value="slots" className="flex-1 min-h-0 mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-0">
-              <div className="md:col-span-1 h-full overflow-y-auto pr-2 pb-2">
+          <TabsContent
+            value="slots"
+            className="mt-0 min-w-0 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+          >
+            <div className="grid grid-cols-1 gap-4 pb-4 lg:grid-cols-3 lg:gap-6 lg:h-full lg:min-h-0">
+              <div className="min-w-0 lg:col-span-1 lg:h-full lg:overflow-y-auto lg:pr-2 pb-2">
                 <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl">
                   <CardHeader>
                     <CardTitle className="text-white">Add New Slot</CardTitle>
@@ -1014,13 +1132,13 @@ function AdminPanel() {
                 </Card>
               </div>
 
-              <div className="md:col-span-2 h-full min-h-0">
+              <div className="min-w-0 lg:col-span-2 lg:h-full lg:min-h-0">
                 <Card className="bg-zinc-900/90 backdrop-blur-md border-zinc-800 shadow-xl h-full flex flex-col">
                   <CardHeader className="shrink-0">
                     <CardTitle className="text-white">Existing Slots</CardTitle>
                   </CardHeader>
-                  <CardContent className="flex-1 min-h-0 overflow-hidden pb-6">
-                    <div className="rounded-md border border-zinc-800 h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
+                  <CardContent className="min-w-0 flex-1 min-h-0 pb-6">
+                    <div className="max-w-full rounded-md border border-zinc-800 lg:h-full overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-zinc-900">
                       <Table>
                         <TableHeader className="bg-zinc-950 sticky top-0 z-10 shadow-md">
                           <TableRow className="border-zinc-800 hover:bg-zinc-950/50">
