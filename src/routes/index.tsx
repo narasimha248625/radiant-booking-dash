@@ -915,7 +915,7 @@ function ArenaStories() {
                         ? `₹${getStartingPrice(venue)}`
                         : "Price on request"}
                     {venue.booking_enabled && (
-                      <span className="font-sans text-xs text-hero-muted"> / hour regular</span>
+                      <span className="font-sans text-xs text-hero-muted"> / hour</span>
                     )}
                   </p>
                   {venue.booking_enabled && (
@@ -1044,7 +1044,7 @@ function ArenaStories() {
                           {item.price_per_hour > 0 ? `₹${getStartingPrice(item)}` : "Pricing soon"}
                         </span>
                         {item.price_per_hour > 0 && (
-                          <span className="text-xs text-muted-foreground"> / hour regular</span>
+                          <span className="text-xs text-muted-foreground"> / hour</span>
                         )}
                       </p>
                       {item.booking_enabled ? (
@@ -1282,16 +1282,18 @@ function ArenaStories() {
                           variant={selected ? "sport" : "sportOutline"}
                           disabled={unavailable}
                           aria-pressed={selected}
-                          className={`h-16 flex-col ${selected ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                          className={`h-20 min-w-0 flex-col gap-0.5 overflow-hidden px-1.5 sm:h-16 ${selected ? "ring-2 ring-primary ring-offset-2" : ""}`}
                           onClick={() => selectSlot(slot)}
                         >
-                          <span>
+                          <span className="whitespace-nowrap text-xs font-bold sm:text-sm">
                             {formatTime(slot.start_time)}
-                            {venue.booking_enabled
-                              ? ` · ₹${getHourPrice(venue, slot.start_time)} regular`
-                              : ""}
                           </span>
-                          <span className="text-[10px] normal-case opacity-65">
+                          {venue.booking_enabled && (
+                            <span className="whitespace-nowrap text-base font-bold leading-tight">
+                              ₹{getHourPrice(venue, slot.start_time)}
+                            </span>
+                          )}
+                          <span className="max-w-full text-center text-[10px] leading-tight normal-case opacity-65">
                             {!venue.booking_enabled
                               ? "Call for price"
                               : slot.status === "booked" || slot.reserved_count >= slot.capacity
@@ -1300,13 +1302,9 @@ function ArenaStories() {
                                   ? "Booked — approval pending"
                                   : slot.status === "limited"
                                     ? "Limited availability"
-                                    : validPhone &&
-                                        welcomeEligibility?.phone === normalizedPhone &&
-                                        !welcomeEligibility.eligible
-                                      ? selected
-                                        ? "Selected"
-                                        : "Available"
-                                      : `₹${getHourPrice(venue, slot.start_time) - getWelcomeDiscount(getHourPrice(venue, slot.start_time))} first booking*`}
+                                    : selected
+                                      ? "Selected"
+                                      : "Available"}
                           </span>
                         </Button>
                       );
@@ -1431,7 +1429,7 @@ function ArenaStories() {
                     <p className="mt-1 text-xs font-semibold text-primary">
                       {welcomeEligibility.eligible
                         ? "This number is eligible: ₹150 off your first booking."
-                        : "This number has been used already. ₹150 first-booking discount is unavailable; regular rates apply."}
+                        : "This number has been used already. The ₹150 offer is only for a first booking."}
                     </p>
                   )}
                 </div>
