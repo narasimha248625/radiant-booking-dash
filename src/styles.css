@@ -23,6 +23,8 @@
   /* ── Typography ── */
   --font-display: "Instrument Serif", serif;
   --font-sans: "Plus Jakarta Sans", sans-serif;
+  --font-brand: "Outfit", sans-serif;
+  --font-cinzel: "Cinzel", serif;
 
   /* ── Border radius scale ── */
   --radius-sm: calc(var(--radius) - 4px);
@@ -36,6 +38,8 @@
   /* ── Semantic color tokens ── */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -260,7 +264,7 @@ html { scroll-behavior: smooth; }
 }
 @utility reveal-up { animation: reveal-up 0.7s ease-out both; }
 
-/* Brand shimmer — sweeps across the STORIES ARENA logo text */
+/* Brand shimmer — sweeps luminous golden light across the STORIES ARENA logo text */
 @keyframes brand-shimmer {
   0%   { background-position: -200% center; }
   100% { background-position: 200% center; }
@@ -268,16 +272,61 @@ html { scroll-behavior: smooth; }
 @utility brand-shimmer {
   background: linear-gradient(
     90deg,
-    var(--gold) 0%,
-    oklch(0.95 0.22 85) 40%,
-    var(--gold) 60%,
-    oklch(0.70 0.18 70) 100%
+    oklch(0.68 0.19 75) 0%,
+    oklch(0.85 0.19 82) 25%,
+    oklch(0.98 0.12 90) 50%,
+    oklch(0.85 0.19 82) 75%,
+    oklch(0.68 0.19 75) 100%
   );
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: brand-shimmer 3.5s linear infinite;
+  animation: brand-shimmer 4s ease-in-out infinite;
+}
+
+/* Brand gold text — rich 24K bullion gold gradient with subtle specular flow */
+@keyframes gold-specular {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+@utility brand-gold-text {
+  background: linear-gradient(
+    135deg,
+    oklch(0.65 0.19 72) 0%,
+    oklch(0.78 0.20 80) 25%,
+    oklch(0.95 0.18 88) 50%,
+    oklch(0.82 0.20 78) 75%,
+    oklch(0.62 0.18 68) 100%
+  );
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gold-specular 6s ease-in-out infinite;
+}
+
+/* Brand title text — deep architectural onyx for light mode, luminous titanium in dark mode */
+@utility brand-title-text {
+  background: linear-gradient(
+    180deg,
+    oklch(0.18 0.03 155) 0%,
+    oklch(0.06 0.02 155) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+:is(.dark *) .brand-title-text {
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    oklch(0.92 0.01 150) 65%,
+    oklch(0.80 0.02 150) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Soft pulse glow on the primary CTA button */

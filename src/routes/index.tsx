@@ -461,6 +461,14 @@ function ArenaStories() {
   const jumpToBooking = () =>
     document.querySelector("#book")?.scrollIntoView({ behavior: "smooth" });
 
+  const scrollToTop = (e: React.MouseEvent) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  };
+
   const changeVenue = (id: string) => {
     setVenueId(id);
     setSlotId("");
@@ -665,20 +673,50 @@ function ArenaStories() {
         <header className="fixed inset-x-0 top-0 z-50 border-b border-border/60 bg-background/90 backdrop-blur-xl">
           <div className="mx-auto grid h-16 max-w-7xl grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 lg:h-20 lg:px-8">
             <a
-              href="#top"
+              href="/"
+              onClick={scrollToTop}
               aria-label="Stories Arena home"
-              className="group flex w-fit min-w-0 select-none flex-col items-center justify-center gap-0.5"
+              className="group flex w-fit min-w-0 cursor-pointer select-none items-center gap-3 transition-all sm:gap-3.5"
             >
-              <img
-                src="/stories-arena-runner-badge.png"
-                alt=""
-                width={56}
-                height={56}
-                className="h-11 w-11 object-contain transition-transform duration-300 group-hover:scale-105 lg:h-14 lg:w-14"
-              />
-              <span className="whitespace-nowrap font-sans text-[9px] font-extrabold leading-none tracking-[0.12em] text-foreground lg:text-[11px]">
-                STORIES ARENA
-              </span>
+              {/* Premium 3D Badge with Ambient Aura */}
+              <div className="relative flex shrink-0 items-center justify-center">
+                {/* Ambient glow */}
+                <div
+                  aria-hidden="true"
+                  className="absolute -inset-1 rounded-full bg-gradient-to-tr from-primary/30 via-emerald-400/20 to-primary/20 blur-sm opacity-70 transition-all duration-500 group-hover:scale-115 group-hover:opacity-100 group-hover:blur-md"
+                />
+                {/* Hairline rim */}
+                <div
+                  aria-hidden="true"
+                  className="absolute -inset-0.5 rounded-full border border-primary/35 opacity-70 transition-all duration-300 group-hover:border-primary/80 group-hover:shadow-[0_0_12px_rgba(34,197,94,0.35)]"
+                />
+                <img
+                  src="/stories-arena-runner-badge.png"
+                  alt="Stories Arena"
+                  width={56}
+                  height={56}
+                  className="relative h-10 w-10 object-contain drop-shadow-[0_3px_10px_rgba(22,101,52,0.35)] transition-transform duration-300 group-hover:scale-105 group-hover:drop-shadow-[0_5px_16px_rgba(34,197,94,0.55)] sm:h-11 sm:w-11 lg:h-13 lg:w-13"
+                />
+              </div>
+
+              {/* Brand Typography Lockup */}
+              <div className="flex min-w-0 flex-col justify-center">
+                <div className="flex items-baseline gap-1.5 leading-none sm:gap-2">
+                  <span className="font-brand brand-title-text text-base font-black tracking-[0.14em] sm:text-lg lg:text-xl">
+                    STORIES
+                  </span>
+                  <span className="font-brand text-primary text-base font-black tracking-[0.14em] drop-shadow-[0_1px_3px_rgba(22,101,52,0.25)] dark:drop-shadow-[0_2px_8px_rgba(34,197,94,0.35)] sm:text-lg lg:text-xl">
+                    ARENA
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 leading-none">
+                  <span className="h-[1px] w-2.5 bg-gradient-to-r from-primary/80 to-transparent sm:w-3" />
+                  <span className="font-sans text-[8px] font-extrabold uppercase tracking-[0.24em] text-muted-foreground/80 transition-colors group-hover:text-primary sm:text-[9px]">
+                    Box Cricket · Vizag
+                  </span>
+                  <span className="h-[1px] w-2.5 bg-gradient-to-l from-primary/80 to-transparent sm:w-3" />
+                </div>
+              </div>
             </a>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -801,9 +839,9 @@ function ArenaStories() {
           {/* Gradient scrim for text legibility */}
           <div className="hero-scrim absolute inset-0" />
 
-          <div className="relative mx-auto grid min-h-[calc(860px-4rem)] w-full max-w-7xl content-end gap-12 px-5 pb-8 pt-28 lg:min-h-[calc(min(940px,100svh)-5rem)] lg:grid-cols-[minmax(0,1.05fr)_minmax(390px,0.72fr)] lg:items-end lg:gap-16 lg:px-8 lg:pb-10">
+          <div className="relative mx-auto grid min-h-[calc(860px-4rem)] w-full max-w-7xl content-start gap-10 px-5 pb-10 pt-20 sm:pt-24 lg:content-center lg:min-h-[calc(min(940px,100svh)-5rem)] lg:grid-cols-[minmax(0,1.05fr)_minmax(390px,0.72fr)] lg:items-center lg:gap-16 lg:px-8 lg:pb-12 lg:pt-20">
             {/* ── Hero copy ── */}
-            <div className="reveal-up min-w-0">
+            <div className="reveal-up min-w-0 lg:-translate-y-6 xl:-translate-y-10">
               {/* Kicker line */}
               <div className="mb-8 flex items-center gap-3 text-[11px] font-semibold uppercase text-primary">
                 <span className="h-px w-12 bg-primary" />
@@ -839,109 +877,126 @@ function ArenaStories() {
             {/* ── Live booking console (hero sidebar) ── */}
             <aside
               aria-label="Live booking console"
-              className="reveal-up border border-hero-foreground/20 bg-hero/90 p-5 shadow-2xl backdrop-blur-md sm:p-7"
+              className="reveal-up flex flex-col justify-between border border-hero-foreground/20 bg-hero/90 p-5 shadow-2xl backdrop-blur-md sm:p-7 lg:min-h-[500px]"
             >
-              {/* Console header */}
-              <div className="flex items-start justify-between gap-5 border-b border-hero-foreground/15 pb-5">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase text-primary">
-                    Live availability
-                  </p>
-                  <h2 className="mt-2 font-display text-4xl leading-none">Book your match.</h2>
+              <div>
+                {/* Console header */}
+                <div className="flex items-start justify-between gap-5 border-b border-hero-foreground/15 pb-5">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase text-primary">
+                      Live availability
+                    </p>
+                    <h2 className="mt-2 font-display text-4xl leading-none">Book your match.</h2>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase text-hero-muted">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+                    Updated now
+                  </span>
                 </div>
-                <span className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase text-hero-muted">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
-                  Updated now
-                </span>
+
+                {/* Pitch selector */}
+                <div className="mt-5">
+                  <label
+                    htmlFor="hero-venue"
+                    className="text-[10px] font-semibold uppercase text-hero-muted"
+                  >
+                    Pitch
+                  </label>
+                  <select
+                    id="hero-venue"
+                    value={venueId}
+                    onChange={(e) => changeVenue(e.target.value)}
+                    className="mt-2 h-12 w-full border border-hero-foreground/20 bg-hero px-3 text-sm font-semibold text-hero-foreground outline-hidden focus:border-primary"
+                  >
+                    {venues.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-5">
+                  <p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p>
+                  <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} hero />
+                </div>
+
+                {/* Quick slot preview (max 3) — fixed min-height container so box never shifts */}
+                <div className="mt-4 grid min-h-[3.5rem] grid-cols-3 gap-2">
+                  {activeSlots.filter(isSlotAvailable).length > 0 ? (
+                    activeSlots
+                      .filter(isSlotAvailable)
+                      .slice(0, 3)
+                      .map((slot) => (
+                        <Button
+                          key={slot.id}
+                          disabled={!venue.booking_enabled}
+                          variant={slot.id === slotId ? "sport" : "ghost"}
+                          className={`h-14 border text-xs ${
+                            slot.id === slotId
+                              ? "border-primary"
+                              : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
+                          }`}
+                          onClick={() => {
+                            setSlotId(slot.id);
+                            setDurationHours(1);
+                            setBooking(null);
+                          }}
+                        >
+                          {formatTime(slot.start_time)}
+                        </Button>
+                      ))
+                  ) : (
+                    <div className="col-span-3 flex h-14 items-center justify-center border border-dashed border-hero-foreground/20 bg-hero/30 px-3 text-center text-xs text-hero-muted">
+                      {!venue.booking_enabled
+                        ? "Phone & walk-in reservations only"
+                        : "No slots open on this date"}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Pitch selector */}
-              <div className="mt-5">
-                <label
-                  htmlFor="hero-venue"
-                  className="text-[10px] font-semibold uppercase text-hero-muted"
-                >
-                  Pitch
-                </label>
-                <select
-                  id="hero-venue"
-                  value={venueId}
-                  onChange={(e) => changeVenue(e.target.value)}
-                  className="mt-2 h-12 w-full border border-hero-foreground/20 bg-hero px-3 text-sm font-semibold text-hero-foreground outline-hidden focus:border-primary"
-                >
-                  {venues.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mt-5">
-                <p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p>
-                <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} hero />
-              </div>
-
-              {/* Quick slot preview (max 3) */}
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {activeSlots
-                  .filter(isSlotAvailable)
-                  .slice(0, 3)
-                  .map((slot) => (
-                    <Button
-                      key={slot.id}
-                      disabled={!venue.booking_enabled}
-                      variant={slot.id === slotId ? "sport" : "ghost"}
-                      className={`h-14 border text-xs ${
-                        slot.id === slotId
-                          ? "border-primary"
-                          : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
-                      }`}
-                      onClick={() => {
-                        setSlotId(slot.id);
-                        setDurationHours(1);
-                        setBooking(null);
-                      }}
-                    >
-                      {formatTime(slot.start_time)}
-                    </Button>
-                  ))}
-              </div>
-
-              {/* Price + CTA */}
-              <div className="mt-6 flex items-end justify-between gap-4 border-t border-hero-foreground/15 pt-5">
+              {/* Price + CTA — guaranteed padding and breathing room on all screens */}
+              <div className="mt-6 flex flex-wrap items-end justify-between gap-3 border-t border-hero-foreground/15 pt-5 sm:flex-nowrap">
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase text-hero-muted">
                     {chosenSlot ? "Selected hour" : "Rates from"}
                   </p>
-                  <p className="font-display text-3xl">
+                  <p className="font-display text-2xl sm:text-3xl leading-tight whitespace-nowrap">
                     {venue.booking_enabled
                       ? `₹${chosenSlot ? getHourPrice(venue, chosenSlot.start_time) : getStartingPrice(venue)}`
                       : venue.price_per_hour > 0
                         ? `₹${getStartingPrice(venue)}`
-                        : "Price on request"}
-                    {venue.booking_enabled && (
+                        : "Custom Quote"}
+                    {(venue.booking_enabled || venue.price_per_hour > 0) && (
                       <span className="font-sans text-xs text-hero-muted"> / hour</span>
                     )}
                   </p>
-                  {venue.booking_enabled && (
-                    <p className="mt-1 text-xs text-hero-muted">
-                      ₹
-                      {(chosenSlot
-                        ? getHourPrice(venue, chosenSlot.start_time)
-                        : getStartingPrice(venue)) -
-                        getWelcomeDiscount(
-                          chosenSlot
-                            ? getHourPrice(venue, chosenSlot.start_time)
-                            : getStartingPrice(venue),
-                        )}{" "}
-                      for a first booking*
-                    </p>
-                  )}
+                  <p className="mt-1 min-h-[1.25rem] text-xs text-hero-muted whitespace-nowrap">
+                    {venue.booking_enabled ? (
+                      <>
+                        ₹
+                        {(chosenSlot
+                          ? getHourPrice(venue, chosenSlot.start_time)
+                          : getStartingPrice(venue)) -
+                          getWelcomeDiscount(
+                            chosenSlot
+                              ? getHourPrice(venue, chosenSlot.start_time)
+                              : getStartingPrice(venue),
+                          )}{" "}
+                        for first booking*
+                      </>
+                    ) : venue.price_per_hour > 0 ? (
+                      "Phone reservation available"
+                    ) : (
+                      "Enquire for custom pricing"
+                    )}
+                  </p>
                 </div>
                 <Button
                   size="lg"
                   variant="sport"
+                  className="shrink-0 h-11 sm:h-12 px-4 sm:px-6 text-xs sm:text-sm whitespace-nowrap"
                   onClick={
                     venue.booking_enabled
                       ? jumpToBooking
@@ -954,7 +1009,7 @@ function ArenaStories() {
                     ? slotId
                       ? "Continue"
                       : "See all slots"
-                    : "Call for pricing"}{" "}
+                    : "Call arena"}{" "}
                   <ArrowRight />
                 </Button>
               </div>
@@ -1772,18 +1827,27 @@ function ArenaStories() {
         <footer className="border-t border-border bg-surface-inverse px-5 py-10 text-surface-inverse-foreground lg:px-8">
           <div className="mx-auto grid max-w-7xl gap-8 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div>
-              <div className="flex w-fit flex-col items-center gap-1">
-                <img
-                  src="/stories-arena-runner-badge.png"
-                  alt=""
-                  width={96}
-                  height={96}
-                  loading="lazy"
-                  className="h-24 w-24 object-contain"
-                />
-                <span className="font-sans text-lg font-extrabold tracking-[0.12em] text-surface-inverse-foreground">
-                  STORIES ARENA
-                </span>
+              <div className="flex w-fit items-center gap-4">
+                <div className="relative flex shrink-0 items-center justify-center">
+                  <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-primary/30 via-emerald-400/20 to-primary/20 blur-md opacity-70" />
+                  <img
+                    src="/stories-arena-runner-badge.png"
+                    alt="Stories Arena"
+                    width={96}
+                    height={96}
+                    loading="lazy"
+                    className="relative h-16 w-16 object-contain drop-shadow-[0_4px_12px_rgba(22,101,52,0.4)]"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-baseline gap-2 font-brand text-2xl font-black tracking-[0.14em]">
+                    <span className="text-surface-inverse-foreground">STORIES</span>
+                    <span className="text-primary drop-shadow-[0_2px_8px_rgba(34,197,94,0.35)]">ARENA</span>
+                  </div>
+                  <span className="mt-1 font-sans text-[10px] font-extrabold uppercase tracking-[0.24em] text-surface-inverse-foreground/60">
+                    Box Cricket · Visakhapatnam
+                  </span>
+                </div>
               </div>
               <p className="mt-2 text-sm text-surface-inverse-foreground/55">
                 YOUR GAME. YOUR STORY. YOUR ARENA.
