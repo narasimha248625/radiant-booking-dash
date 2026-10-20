@@ -89,7 +89,13 @@ function createHourlyFallbackSlots(venueIds: string[], firstDate: string, days =
 }
 
 function getUpiConfig() {
-  const vpa = process.env["UPI_VPA"];
+  const configuredVpa = process.env["UPI_VPA"]?.trim();
+  // The live Vercel project still has the previous UPI ID in its environment.
+  // Redirect that setting until it can be updated in the other Vercel account.
+  const vpa =
+    configuredVpa?.toLowerCase() === "ruttalaashok2001@ybl"
+      ? "BHARATPE2B0R0H8P7S25956@unitype"
+      : configuredVpa;
 
   const payeeName = process.env["UPI_PAYEE_NAME"] || "Stories Arena";
 
