@@ -2,7 +2,7 @@
 
 TanStack Start booking site with hourly turf availability, UPI QR payments, and an admin review dashboard. The `main` branch is connected to Lovable. Keep pushed history intact; use normal commits and pushes.
 
-The 5,400 sq. ft. pitch uses website rates of ₹599 (6–10 AM), ₹499 (10 AM–5 PM), and ₹699 (5 PM–6 AM). The 1,080 sq. ft. and separate bowling-machine pitches are listed with online booking disabled until their full time-slot rates are provided.
+The 5,400 sq. ft. pitch uses hourly rates of ₹749 (6–10 AM), ₹649 (10 AM–5 PM), and ₹849 (5 PM–6 AM). The first website booking for an eligible mobile number gets ₹150 off the booking total. The 1,080 sq. ft. and separate bowling-machine pitches are listed with online booking disabled until their full time-slot rates are provided.
 
 ## Local development
 
@@ -29,7 +29,7 @@ Open `http://localhost:8080/` for booking and `http://localhost:8080/admin` for 
 | `SUPABASE_SERVICE_ROLE_KEY`     | Secret/service-role key for that project           | Server only   |
 | `VITE_SUPABASE_URL`             | Same project URL                                   | Browser build |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Same publishable key                               | Browser build |
-| `UPI_VPA`                       | `ruttalaashok2001@ybl`                             | Server only   |
+| `UPI_VPA`                       | `BHARATPE2B0R0H8P7S25956@unitype`                  | Server only   |
 | `UPI_PAYEE_NAME`                | `Ruttala Ashok`                                    | Server        |
 | `ADMIN_EMAILS`                  | `arenastories6@gmail.com`                          | Server        |
 
@@ -37,7 +37,7 @@ Use the **same Supabase project** for every URL and key. Do not put the secret/s
 
 The SQL files in `supabase/migrations` are required for a fresh database. GitHub or Vercel deployments do not apply database migrations automatically. The remote hourly booking migration was recorded under a different timestamp with identical SQL; the no-op migration file preserves that remote history.
 
-After deployment, check that the home page shows live slots, a newly created QR scans as `ruttalaashok2001@ybl`, a 12-digit UPI reference submits, and the admin dashboard loads bookings. Payment status is reviewed manually in `/admin`; submitting a reference alone does not confirm a booking. Redeploy after changing a Vercel environment variable so the new value reaches the build and server functions.
+After deployment, check that the home page shows live slots, a newly created QR scans as `BHARATPE2B0R0H8P7S25956@unitype`, a 12-digit UPI reference submits, and the admin dashboard loads bookings. Payment status is reviewed manually in `/admin`; submitting a reference alone does not confirm a booking. Redeploy after changing a Vercel environment variable so the new value reaches the build and server functions.
 
 ## Checks
 
