@@ -278,6 +278,12 @@ function ArenaStories() {
 
   const normalizedPhone = `+91${customerPhoneDigits}`;
   const validPhone = /^[6-9]\d{9}$/.test(customerPhoneDigits);
+  const offerAlreadyUsed =
+    validPhone &&
+    welcomeEligibility?.phone === normalizedPhone &&
+    welcomeEligibility.eligible === false;
+  const offerEligible =
+    validPhone && welcomeEligibility?.phone === normalizedPhone && welcomeEligibility.eligible;
 
   useEffect(() => {
     setWelcomeEligibility(null);
@@ -1259,6 +1265,39 @@ function ArenaStories() {
                 <p className="mt-5 text-sm font-semibold text-muted-foreground">
                   Select a starting hour below. Then choose how many consecutive hours to book.
                 </p>
+
+                {venue.booking_enabled && (
+                  <div
+                    aria-live="polite"
+                    className={`mt-5 border-l-4 px-4 py-4 sm:px-6 sm:py-5 ${offerAlreadyUsed ? "border-status-danger bg-status-danger/10" : "border-primary bg-primary/10"}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Sparkles
+                        aria-hidden="true"
+                        className={`mt-1 h-7 w-7 shrink-0 ${offerAlreadyUsed ? "text-status-danger" : "text-primary"}`}
+                      />
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                          First website booking offer
+                        </p>
+                        <p
+                          className={`mt-1 font-display text-3xl leading-tight sm:text-4xl ${offerAlreadyUsed ? "text-status-danger" : "text-primary"}`}
+                        >
+                          {offerAlreadyUsed
+                            ? "₹150 OFFER ALREADY USED"
+                            : "SAVE ₹150 ON YOUR FIRST BOOKING"}
+                        </p>
+                        <p className="mt-2 text-sm font-semibold text-foreground">
+                          {offerAlreadyUsed
+                            ? "This number has an existing booking or reservation. The rates shown below apply."
+                            : offerEligible
+                              ? "Your number qualifies. ₹150 comes off the total at checkout."
+                              : "Use a new mobile number at checkout. ₹150 comes off the total once, even if you book multiple hours."}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Slot grid */}
                 <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
