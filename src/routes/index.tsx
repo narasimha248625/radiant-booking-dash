@@ -25,6 +25,8 @@ import {
   ArrowRight,
   CalendarDays,
   Check,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   MapPin,
   Menu,
@@ -36,6 +38,7 @@ import {
   Sparkles,
   Star,
   Sun,
+  Tag,
   Trophy,
   Users,
   X,
@@ -55,6 +58,8 @@ import {
   getTurfData,
   submitUpiPaymentReference,
 } from "@/lib/turf.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { turfSocket } from "@/lib/socket";
 import heroImage from "@/assets/turf-hero.jpg";
 import arenaImage from "@/assets/arena-aerial.jpg";
 import actionImage from "@/assets/match-action.jpg";
@@ -199,7 +204,33 @@ function formatDay(value: string) {
    Main component
    ───────────────────────────────────────────────────────── */
 function ArenaStories() {
-  const { venues, slots } = Route.useLoaderData();
+  const { venues: rawVenues, slots } = Route.useLoaderData();
+  const isComingSoonVenue = (v?: { name?: string | null; is_coming_soon?: boolean }) => {
+    if (!v) return false;
+    if (v.is_coming_soon) return true;
+    const lower = (v.name ?? "").toLowerCase();
+    return lower.includes("1080") || lower.includes("bowling");
+  };
+
+  const venues = useMemo(() => {
+    const getOrder = (v: (typeof rawVenues)[number]) => {
+      const lower = (v.name ?? "").toLowerCase();
+      if (lower.includes("5400") || (v.featured && !lower.includes("bowling"))) return 1;
+      if (lower.includes("1080")) return 2;
+      if (lower.includes("bowling")) return 3;
+      return 4;
+    };
+    return [...rawVenues]
+      .map((v) => {
+        const comingSoon = isComingSoonVenue(v);
+        return {
+          ...v,
+          is_coming_soon: comingSoon,
+          booking_enabled: comingSoon ? false : (v.booking_enabled ?? true),
+        };
+      })
+      .sort((a, b) => getOrder(a) - getOrder(b));
+  }, [rawVenues]);
   const router = useRouter();
   const createUpiRequest = useServerFn(createUpiPaymentRequest);
   const getUpiStatus = useServerFn(getUpiBookingStatus);
@@ -211,6 +242,83 @@ function ArenaStories() {
   const { isDark, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  /* ── Real-time Slot Sync (Socket.io & WebSockets) ── */
+  const [realtimeOverrides, setRealtimeOverrides] = useState<
+    Record<string, { status: "available" | "booked" | "held" }>
+  >({});
+
+  useEffect(() => {
+    // 1. WebSocket sync via turfSocket (Socket.io & Supabase Broadcast)
+    const unsubscribe = turfSocket.onSlotChange((payload) => {
+      console.log("[UserPage] Received real-time slot update:", payload);
+      setRealtimeOverrides((prev) => ({
+        ...prev,
+        [payload.slotId]: { status: payload.status },
+      }));
+      void router.invalidate();
+    });
+
+    // 2. Direct Supabase postgres_changes listener
+    const channel = supabase
+      .channel("public-slots-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "slots",
+        },
+        (payload) => {
+          console.log("[UserPage] Slots postgres_changes event:", payload);
+          if (payload.new && (payload.new as any).id) {
+            const newSlot = payload.new as any;
+            setRealtimeOverrides((prev) => ({
+              ...prev,
+              [newSlot.id]: { status: newSlot.status },
+            }));
+          }
+          void router.invalidate();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "bookings",
+        },
+        () => {
+          void router.invalidate();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [router]);
+
+  const mergedSlots = useMemo(() => {
+    if (Object.keys(realtimeOverrides).length === 0) return slots;
+    return slots.map((s) => {
+      const override = realtimeOverrides[s.id];
+      if (override) {
+        return {
+          ...s,
+          status: override.status,
+          reserved_count:
+            override.status === "booked"
+              ? s.capacity
+              : override.status === "available"
+                ? 0
+                : s.reserved_count,
+        };
+      }
+      return s;
+    });
+  }, [slots, realtimeOverrides]);
+
   /* ── Venue + slot selection state ── */
   const [venueId, setVenueId] = useState(venues[0]?.id ?? "");
   const venue = venues.find((item) => item.id === venueId) ?? venues[0];
@@ -221,12 +329,12 @@ function ArenaStories() {
   }, []);
   const venueSlots = useMemo(
     () =>
-      slots.filter(
+      mergedSlots.filter(
         (slot) =>
           slot.venue_id === venueId &&
           new Date(`${slot.slot_date}T${slot.start_time}+05:30`).getTime() > currentTime,
       ),
-    [slots, venueId, currentTime],
+    [mergedSlots, venueId, currentTime],
   );
 
   /* Unique sorted dates for the selected venue */
@@ -260,6 +368,10 @@ function ArenaStories() {
   const [statusCheckError, setStatusCheckError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [couponError, setCouponError] = useState("");
+  const [phoneChecking, setPhoneChecking] = useState(false);
   const [upiTransactionId, setUpiTransactionId] = useState("");
   const [upiPayment, setUpiPayment] = useState<{
     bookingId: string;
@@ -275,6 +387,7 @@ function ArenaStories() {
     payeeName: string;
     upiVpa: string;
   } | null>(null);
+  const [heroSlotsExpanded, setHeroSlotsExpanded] = useState(false);
 
   const normalizedPhone = `+91${customerPhoneDigits}`;
   const validPhone = /^[6-9]\d{9}$/.test(customerPhoneDigits);
@@ -286,17 +399,49 @@ function ArenaStories() {
     validPhone && welcomeEligibility?.phone === normalizedPhone && welcomeEligibility.eligible;
 
   useEffect(() => {
-    setWelcomeEligibility(null);
-    if (!validPhone) return;
+    if (!validPhone) {
+      setWelcomeEligibility(null);
+      setPhoneChecking(false);
+      // Revoke coupon if user clears phone number since WELCOME150 requires a verified new number
+      if (appliedCoupon) {
+        setAppliedCoupon(null);
+        setCouponError("Please enter your 10-digit mobile number to verify WELCOME150 eligibility.");
+      }
+      return;
+    }
+
     let active = true;
+    setPhoneChecking(true);
     const timer = window.setTimeout(async () => {
       try {
         const result = await checkWelcomeOffer({ data: { customerPhone: normalizedPhone } });
-        if (active) setWelcomeEligibility({ phone: normalizedPhone, eligible: result.eligible });
+        if (!active) return;
+        setWelcomeEligibility({ phone: normalizedPhone, eligible: result.eligible });
+        if (result.eligible) {
+          // If user previously typed WELCOME150, activate coupon now that new number is verified
+          const clean = couponInput.trim().toUpperCase().replace(/\s+/g, "");
+          if (clean === "WELCOME150" && !appliedCoupon) {
+            setAppliedCoupon("WELCOME150");
+            setCouponError("");
+            toast.success("✓ New user verified! Coupon WELCOME150 applied (₹150 off).");
+          }
+        } else {
+          // If phone is not a new user, revoke coupon immediately
+          if (appliedCoupon) {
+            setAppliedCoupon(null);
+            setCouponError(
+              `This mobile number (+91 ${customerPhoneDigits}) already has bookings. WELCOME150 is only for new users.`,
+            );
+            toast.error("WELCOME150 is valid only for new users with a new mobile number.");
+          }
+        }
       } catch {
-        // The reservation transaction checks eligibility again before charging.
+        // Fallback
+      } finally {
+        if (active) setPhoneChecking(false);
       }
-    }, 400);
+    }, 350);
+
     return () => {
       active = false;
       window.clearTimeout(timer);
@@ -305,6 +450,9 @@ function ArenaStories() {
     checkWelcomeOffer,
     normalizedPhone,
     validPhone,
+    customerPhoneDigits,
+    couponInput,
+    appliedCoupon,
     upiPayment?.bookingId,
     booking?.booking_code,
   ]);
@@ -423,8 +571,15 @@ function ArenaStories() {
     };
   }, [getUpiStatus, historyLoaded, paymentHistory, router]);
 
-  const chosenSlot = slots.find((slot) => slot.id === slotId);
+  const chosenSlot = mergedSlots.find((slot) => slot.id === slotId);
   const chosenSlotIndex = activeSlots.findIndex((slot) => slot.id === slotId);
+
+  useEffect(() => {
+    if (slotId && realtimeOverrides[slotId]?.status === "booked") {
+      setSlotId("");
+      toast.info("A selected slot was just reserved offline and is no longer available.");
+    }
+  }, [slotId, realtimeOverrides]);
   const maxDuration = useMemo(() => {
     if (chosenSlotIndex < 0) return 1;
     let count = 0;
@@ -447,12 +602,15 @@ function ArenaStories() {
     chosenSlotIndex >= 0
       ? activeSlots.slice(chosenSlotIndex, chosenSlotIndex + Math.min(durationHours, maxDuration))
       : [];
-  const selectedPrice = venue ? getBookingPrice(venue, selectedSlots) : 0;
+  const isCouponValid = appliedCoupon?.trim().toUpperCase().replace(/\s+/g, "") === "WELCOME150";
+  const selectedPrice =
+    venue && selectedSlots.length > 0 ? getBookingPrice(venue, selectedSlots) : 0;
+  // When WELCOME150 is applied, immediately deduct ₹150 from total (unless number already used)
   const welcomeDiscount =
-    welcomeEligibility?.phone === normalizedPhone && welcomeEligibility.eligible
+    isCouponValid && !offerAlreadyUsed && selectedPrice > 0
       ? getWelcomeDiscount(selectedPrice)
       : 0;
-  const checkoutPrice = selectedPrice - welcomeDiscount;
+  const checkoutPrice = Math.max(0, selectedPrice - welcomeDiscount);
 
   /* 4-step progress indicator (1 = venue, 2 = slot, 3 = details, 4 = confirmed) */
   const step = booking ? 4 : slotId ? 3 : venueId ? 2 : 1;
@@ -469,12 +627,50 @@ function ArenaStories() {
     }
   };
 
+  const handleApplyCoupon = (codeToApply?: string) => {
+    const rawCode = (codeToApply ?? couponInput).trim();
+    if (!rawCode) {
+      setCouponError("Please write a coupon code.");
+      return;
+    }
+    const cleanCode = rawCode.toUpperCase().replace(/\s+/g, "");
+    if (cleanCode !== "WELCOME150") {
+      setCouponError("Invalid coupon code. Try WELCOME150 for first-time booking offer.");
+      return;
+    }
+
+    if (validPhone && offerAlreadyUsed) {
+      setCouponError(
+        `This mobile number (+91 ${customerPhoneDigits}) has already been used. WELCOME150 is applicable only for new users with a new mobile number.`,
+      );
+      toast.error("WELCOME150 is only for new users with a new mobile number.");
+      return;
+    }
+
+    // Apply coupon and deduct discount immediately on right side
+    setAppliedCoupon("WELCOME150");
+    setCouponInput("WELCOME150");
+    setCouponError("");
+    toast.success("✓ Coupon WELCOME150 applied! ₹150 discount deducted.");
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
+    toast.info("Coupon removed.");
+  };
+
   const changeVenue = (id: string) => {
     setVenueId(id);
     setSlotId("");
     setDurationHours(1);
     setSelectedDate("");
     setBooking(null);
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
+    setHeroSlotsExpanded(false);
   };
 
   const selectDate = (date: string) => {
@@ -483,13 +679,38 @@ function ArenaStories() {
     setSlotId("");
     setDurationHours(1);
     setError("");
+    setHeroSlotsExpanded(false);
   };
 
-  /** Select a continuous range by tapping its first and last hour. */
+  /** Select a continuous range by tapping its first and last hour, or tap a selected slot to remove it. */
   const selectSlot = (slot: (typeof activeSlots)[number]) => {
     if (!venue?.booking_enabled) return;
     const clickedIndex = activeSlots.findIndex((item) => item.id === slot.id);
     if (clickedIndex < 0 || !isSlotAvailable(slot)) return;
+
+    // If the clicked slot is already selected (green), remove/deselect it
+    const isAlreadySelected = selectedSlots.some((item) => item.id === slot.id);
+    if (isAlreadySelected) {
+      if (selectedSlots.length <= 1) {
+        // Single slot was selected: remove/deselect completely
+        setSlotId("");
+        setDurationHours(1);
+      } else if (slot.id === selectedSlots[selectedSlots.length - 1]?.id) {
+        // Last slot clicked: shorten range by 1
+        setDurationHours((d) => Math.max(1, d - 1));
+      } else if (slot.id === selectedSlots[0]?.id && selectedSlots[1]) {
+        // First slot clicked: move start to next slot and shorten duration
+        setSlotId(selectedSlots[1].id);
+        setDurationHours((d) => Math.max(1, d - 1));
+      } else {
+        // Clicked inside range: deselect completely
+        setSlotId("");
+        setDurationHours(1);
+      }
+      setError("");
+      setBooking(null);
+      return;
+    }
 
     if (chosenSlotIndex < 0) {
       setSlotId(slot.id);
@@ -526,6 +747,39 @@ function ArenaStories() {
       minute: "2-digit",
     });
 
+  /** Format a slot start time cleanly, e.g. "1:00 PM" */
+  const getSlotStartTime = (startTime: string) => {
+    const startHour = Number(startTime.slice(0, 2));
+    const startMin = Number(startTime.slice(3, 5)) || 0;
+    const startDate = new Date(2026, 0, 1, startHour, startMin);
+    return startDate.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  /** Format a slot end time cleanly, e.g. "2:00 PM" */
+  const getSlotEndTime = (startTime: string, durationMinutes = 60) => {
+    const startHour = Number(startTime.slice(0, 2));
+    const startMin = Number(startTime.slice(3, 5)) || 0;
+    const startTotal = startHour * 60 + startMin;
+    const endTotal = (startTotal + durationMinutes) % (24 * 60);
+    const endHour = Math.floor(endTotal / 60);
+    const endMin = endTotal % 60;
+    const endDate = new Date(2026, 0, 1, endHour, endMin);
+    return endDate.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  /** Format a slot as a range, e.g. "1:00 PM – 2:00 PM" */
+  const formatSlotRange = (startTime: string, durationMinutes = 60) => {
+    return `${getSlotStartTime(startTime)} – ${getSlotEndTime(startTime, durationMinutes)}`;
+  };
+
   /* ── Booking submission ── */
   async function confirmBooking() {
     if (
@@ -555,6 +809,7 @@ function ArenaStories() {
           customerPhone: normalizedPhone,
           teamSize,
           customerSessionId: getCustomerSessionId(),
+          couponCode: appliedCoupon || undefined,
         },
       });
       if (!payment.success) {
@@ -877,7 +1132,7 @@ function ArenaStories() {
             {/* ── Live booking console (hero sidebar) ── */}
             <aside
               aria-label="Live booking console"
-              className="reveal-up flex flex-col justify-between border border-hero-foreground/20 bg-hero/90 p-5 shadow-2xl backdrop-blur-md sm:p-7 lg:min-h-[500px]"
+              className="reveal-up flex flex-col justify-between border border-hero-foreground/20 bg-hero/90 p-4 min-[400px]:p-5 sm:p-7 shadow-2xl backdrop-blur-md lg:min-h-[500px]"
             >
               <div>
                 {/* Console header */}
@@ -910,70 +1165,170 @@ function ArenaStories() {
                   >
                     {venues.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.name}
+                        {item.name} {item.is_coming_soon ? "— Coming Soon" : ""}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="mt-5">
-                  <p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p>
-                  <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} hero />
-                </div>
-
-                {/* Quick slot preview (max 3) — fixed min-height container so box never shifts */}
-                <div className="mt-4 grid min-h-[3.5rem] grid-cols-3 gap-2">
-                  {activeSlots.filter(isSlotAvailable).length > 0 ? (
-                    activeSlots
-                      .filter(isSlotAvailable)
-                      .slice(0, 3)
-                      .map((slot) => (
-                        <Button
-                          key={slot.id}
-                          disabled={!venue.booking_enabled}
-                          variant={slot.id === slotId ? "sport" : "ghost"}
-                          className={`h-14 border text-xs ${
-                            slot.id === slotId
-                              ? "border-primary"
-                              : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
-                          }`}
-                          onClick={() => {
-                            setSlotId(slot.id);
-                            setDurationHours(1);
-                            setBooking(null);
-                          }}
-                        >
-                          {formatTime(slot.start_time)}
-                        </Button>
-                      ))
-                  ) : (
-                    <div className="col-span-3 flex h-14 items-center justify-center border border-dashed border-hero-foreground/20 bg-hero/30 px-3 text-center text-xs text-hero-muted">
-                      {!venue.booking_enabled
-                        ? "Phone & walk-in reservations only"
-                        : "No slots open on this date"}
+                {venue.is_coming_soon ? (
+                  <div className="mt-5 rounded-sm border border-dashed border-amber-500/40 bg-amber-500/10 p-5 text-center">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-500">
+                      ⚡ Coming Soon
+                    </span>
+                    <p className="mt-3 font-display text-2xl text-hero-foreground">
+                      Pitch & Pricing Launching Soon
+                    </p>
+                    <p className="mx-auto mt-2 max-w-xs text-xs text-hero-muted leading-relaxed">
+                      We are preparing this pitch for launch. Hourly rates and live match bookings will be enabled shortly.
+                    </p>
+                    <Button
+                      variant="sport"
+                      size="sm"
+                      className="mt-4 text-xs font-bold uppercase tracking-wider"
+                      onClick={() => {
+                        const activePitch = venues.find((v) => !v.is_coming_soon);
+                        if (activePitch) changeVenue(activePitch.id);
+                      }}
+                    >
+                      Book 5400 sq. ft. Pitch
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-5">
+                      <p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p>
+                      <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} hero />
                     </div>
-                  )}
-                </div>
+
+                    {/* Quick slot preview — 3 lines with 'Show more' button */}
+                    <div
+                      className={`mt-4 grid grid-cols-3 gap-1.5 sm:gap-2 transition-all duration-300 ${
+                        heroSlotsExpanded
+                          ? "max-h-[380px] overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                          : ""
+                      }`}
+                    >
+                      {activeSlots.filter(isSlotAvailable).length > 0 ? (
+                        (() => {
+                          const availableHeroSlots = activeSlots.filter(isSlotAvailable);
+                          const shouldTruncate = !heroSlotsExpanded && availableHeroSlots.length > 8;
+                          const displayedSlots = shouldTruncate
+                            ? availableHeroSlots.slice(0, 8)
+                            : availableHeroSlots;
+
+                          return (
+                            <>
+                              {displayedSlots.map((slot) => (
+                                <Button
+                                  key={slot.id}
+                                  disabled={!venue.booking_enabled}
+                                  variant={slot.id === slotId ? "sport" : "ghost"}
+                                  className={`h-[3.75rem] min-w-0 px-1.5 sm:px-2 py-2 border text-center font-bold leading-tight rounded-md ${
+                                    slot.id === slotId
+                                      ? "border-primary"
+                                      : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
+                                  }`}
+                                  onClick={() => {
+                                    if (slot.id === slotId) {
+                                      setSlotId("");
+                                      setDurationHours(1);
+                                    } else {
+                                      setSlotId(slot.id);
+                                      setDurationHours(1);
+                                      setBooking(null);
+                                    }
+                                  }}
+                                >
+                                  <span className="flex flex-col items-center justify-center w-full min-w-0 gap-0.5 leading-tight">
+                                    <span className="text-[11px] min-[360px]:text-xs sm:text-[13px] font-bold tracking-tight whitespace-nowrap">
+                                      {getSlotStartTime(slot.start_time)}
+                                    </span>
+                                    <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-semibold opacity-75 whitespace-nowrap">
+                                      to {getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)}
+                                    </span>
+                                  </span>
+                                </Button>
+                              ))}
+
+                              {shouldTruncate ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => setHeroSlotsExpanded(true)}
+                                  className="h-[3.75rem] min-w-0 px-1.5 py-2 border border-dashed border-primary/50 bg-primary/10 text-primary hover:border-primary hover:bg-primary/20 text-[11px] min-[360px]:text-xs font-bold flex flex-col items-center justify-center gap-0.5 leading-tight rounded-md"
+                                >
+                                  <span className="flex items-center justify-center gap-1 font-bold whitespace-nowrap">
+                                    Show more <ChevronDown className="h-3 w-3 shrink-0" />
+                                  </span>
+                                  <span className="text-[8.5px] min-[360px]:text-[9.5px] font-normal opacity-80 whitespace-nowrap">
+                                    +{availableHeroSlots.length - 8} more
+                                  </span>
+                                </Button>
+                              ) : availableHeroSlots.length === 8 ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={jumpToBooking}
+                                  className="h-14 min-w-0 px-1 py-1 border border-dashed border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10 text-[10px] min-[360px]:text-[11px] font-bold flex flex-col items-center justify-center gap-0.5 leading-tight"
+                                >
+                                  <span className="flex items-center justify-center gap-1 font-bold whitespace-nowrap">
+                                    Show more <ArrowRight className="h-3 w-3 shrink-0" />
+                                  </span>
+                                  <span className="text-[8.5px] text-hero-muted font-normal whitespace-nowrap">
+                                    Full schedule
+                                  </span>
+                                </Button>
+                              ) : null}
+
+                              {heroSlotsExpanded && availableHeroSlots.length > 8 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  onClick={() => setHeroSlotsExpanded(false)}
+                                  className="h-14 min-w-0 px-1 py-1 border border-dashed border-hero-foreground/30 bg-hero/20 text-hero-muted hover:text-hero-foreground text-[10px] min-[360px]:text-[11px] font-bold flex items-center justify-center gap-1 leading-tight whitespace-nowrap"
+                                >
+                                  <span>Show less</span>
+                                  <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                                </Button>
+                              )}
+                            </>
+                          );
+                        })()
+                      ) : (
+                        <div className="col-span-3 flex h-14 items-center justify-center border border-dashed border-hero-foreground/20 bg-hero/30 px-3 text-center text-xs text-hero-muted">
+                          {!venue.booking_enabled
+                            ? "Phone & walk-in reservations only"
+                            : "No slots open on this date"}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Price + CTA — guaranteed padding and breathing room on all screens */}
-              <div className="mt-6 flex flex-wrap items-end justify-between gap-3 border-t border-hero-foreground/15 pt-5 sm:flex-nowrap">
+              <div className="mt-6 flex flex-col min-[440px]:flex-row min-[440px]:items-end justify-between gap-3 border-t border-hero-foreground/15 pt-5">
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase text-hero-muted">
-                    {chosenSlot ? "Selected hour" : "Rates from"}
+                    {venue.is_coming_soon ? "Status" : chosenSlot ? "Selected hour" : "Rates from"}
                   </p>
-                  <p className="font-display text-2xl sm:text-3xl leading-tight whitespace-nowrap">
-                    {venue.booking_enabled
-                      ? `₹${chosenSlot ? getHourPrice(venue, chosenSlot.start_time) : getStartingPrice(venue)}`
-                      : venue.price_per_hour > 0
-                        ? `₹${getStartingPrice(venue)}`
-                        : "Custom Quote"}
-                    {(venue.booking_enabled || venue.price_per_hour > 0) && (
+                  <p className={`font-display leading-tight whitespace-nowrap ${venue.is_coming_soon ? "text-2xl text-amber-500" : "font-display text-2xl sm:text-3xl"}`}>
+                    {venue.is_coming_soon
+                      ? "Coming Soon"
+                      : venue.booking_enabled
+                        ? `₹${chosenSlot ? getHourPrice(venue, chosenSlot.start_time) : getStartingPrice(venue)}`
+                        : venue.price_per_hour > 0
+                          ? `₹${getStartingPrice(venue)}`
+                          : "Custom Quote"}
+                    {!venue.is_coming_soon && (venue.booking_enabled || venue.price_per_hour > 0) && (
                       <span className="font-sans text-xs text-hero-muted"> / hour</span>
                     )}
                   </p>
                   <p className="mt-1 min-h-[1.25rem] text-xs text-hero-muted whitespace-nowrap">
-                    {venue.booking_enabled ? (
+                    {venue.is_coming_soon ? (
+                      <span className="text-amber-500/90 font-medium">Prices to be announced</span>
+                    ) : venue.booking_enabled ? (
                       <>
                         ₹
                         {(chosenSlot
@@ -984,7 +1339,7 @@ function ArenaStories() {
                               ? getHourPrice(venue, chosenSlot.start_time)
                               : getStartingPrice(venue),
                           )}{" "}
-                        for first booking*
+                        with code WELCOME150*
                       </>
                     ) : venue.price_per_hour > 0 ? (
                       "Phone reservation available"
@@ -996,20 +1351,28 @@ function ArenaStories() {
                 <Button
                   size="lg"
                   variant="sport"
-                  className="shrink-0 h-11 sm:h-12 px-4 sm:px-6 text-xs sm:text-sm whitespace-nowrap"
+                  className="w-full min-[440px]:w-auto shrink-0 h-11 sm:h-12 px-4 sm:px-6 text-xs sm:text-sm whitespace-nowrap"
                   onClick={
-                    venue.booking_enabled
-                      ? jumpToBooking
-                      : () => {
+                    venue.is_coming_soon
+                      ? () => {
+                          const activePitch = venues.find((v) => !v.is_coming_soon);
+                          if (activePitch) changeVenue(activePitch.id);
+                          jumpToBooking();
+                        }
+                      : venue.booking_enabled
+                        ? jumpToBooking
+                        : () => {
                           window.location.href = ARENA_PHONE_HREF;
                         }
                   }
                 >
-                  {venue.booking_enabled
-                    ? slotId
-                      ? "Continue"
-                      : "See all slots"
-                    : "Call arena"}{" "}
+                  {venue.is_coming_soon
+                    ? "Book 5400 sq. ft."
+                    : venue.booking_enabled
+                      ? slotId
+                        ? "Continue"
+                        : "See all slots"
+                      : "Call arena"}{" "}
                   <ArrowRight />
                 </Button>
               </div>
@@ -1037,11 +1400,10 @@ function ArenaStories() {
               {venues.map((item, index) => (
                 <article
                   key={item.id}
-                  className={`group overflow-hidden border transition-all duration-300 ${
-                    venueId === item.id
+                  className={`group overflow-hidden border transition-all duration-300 ${venueId === item.id
                       ? "border-primary shadow-[var(--shadow-punch)]"
                       : "border-border hover:border-foreground/40"
-                  }`}
+                    }`}
                 >
                   {/* Venue image */}
                   <div className="relative aspect-[4/3] overflow-hidden">
@@ -1059,11 +1421,15 @@ function ArenaStories() {
                     <span className="absolute left-4 top-4 bg-surface-inverse px-3 py-1 text-xs font-bold uppercase text-surface-inverse-foreground">
                       0{index + 1}
                     </span>
-                    {item.featured && (
+                    {item.is_coming_soon ? (
+                      <span className="absolute right-4 top-4 rounded-sm bg-amber-500 px-3 py-1 text-xs font-black uppercase tracking-wider text-black shadow-lg">
+                        Coming Soon
+                      </span>
+                    ) : item.featured ? (
                       <span className="absolute right-4 top-4 bg-gold px-3 py-1 text-xs font-bold uppercase text-gold-foreground">
                         Most played
                       </span>
-                    )}
+                    ) : null}
 
                     <h3 className="absolute bottom-4 left-4 font-display text-3xl text-white drop-shadow-md">
                       {item.name}
@@ -1100,15 +1466,26 @@ function ArenaStories() {
                     </div>
 
                     <div className="mt-5 flex items-end justify-between border-t border-border pt-4">
-                      <p>
-                        <span className="font-display text-3xl">
-                          {item.price_per_hour > 0 ? `₹${getStartingPrice(item)}` : "Pricing soon"}
+                      <div>
+                        <span className={`font-display text-2xl sm:text-3xl ${item.is_coming_soon ? "text-amber-500" : ""}`}>
+                          {item.is_coming_soon
+                            ? "Coming Soon"
+                            : item.price_per_hour > 0
+                              ? `₹${getStartingPrice(item)}`
+                              : "Pricing soon"}
                         </span>
-                        {item.price_per_hour > 0 && (
+                        {!item.is_coming_soon && item.price_per_hour > 0 && (
                           <span className="text-xs text-muted-foreground"> / hour</span>
                         )}
-                      </p>
-                      {item.booking_enabled ? (
+                        {item.is_coming_soon && (
+                          <p className="text-[11px] font-semibold text-muted-foreground">Pricing to be announced</p>
+                        )}
+                      </div>
+                      {item.is_coming_soon ? (
+                        <span className="rounded-sm border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-extrabold uppercase tracking-wider text-amber-500">
+                          Coming Soon
+                        </span>
+                      ) : item.booking_enabled ? (
                         <Button
                           variant={venueId === item.id ? "sport" : "sportOutline"}
                           onClick={() => {
@@ -1139,59 +1516,85 @@ function ArenaStories() {
                 </article>
               ))}
             </div>
-            <div className="mt-8 grid gap-5 lg:grid-cols-2">
+            <div className="mt-8 grid gap-6 lg:grid-cols-2">
               {venues.map((item) => (
-                <div key={item.id} className="min-w-0 border border-border bg-card p-5">
-                  <h3 className="font-display text-2xl">{item.name}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">Hourly prices by time period</p>
-                  <div className="mt-4 divide-y divide-border sm:hidden">
+                <div
+                  key={item.id}
+                  className={`min-w-0 border border-border bg-card p-6 rounded-lg transition-all ${
+                    !item.is_coming_soon ? "lg:col-span-2 shadow-xs" : "lg:col-span-1"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="font-display text-2xl sm:text-3xl">{item.name}</h3>
+                    </div>
+                    {item.is_coming_soon ? (
+                      <span className="rounded-full bg-amber-500/15 border border-amber-500/40 px-3 py-0.5 text-xs font-black uppercase tracking-wider text-amber-500">
+                        Coming Soon
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-primary/15 border border-primary/35 px-3 py-0.5 text-xs font-black uppercase tracking-wider text-primary">
+                        Live Booking Active
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                    Hourly prices by time period
+                  </p>
+                  <div className="mt-5 divide-y divide-border sm:hidden">
                     {publicPriceBands.map((band) => {
                       const walkIn = item[band.walkIn];
                       const website = item[band.website];
                       return (
                         <div key={band.time} className="py-3 first:pt-0">
                           <p className="mb-2 text-sm font-bold">{band.time}</p>
-                          <div className="grid grid-cols-3 gap-2 text-[11px]">
-                            <span>
-                              <span className="block text-muted-foreground">Original</span>
-                              {website === null ? "—" : `₹${website}`}
-                            </span>
-                            <span>
-                              <span className="block text-muted-foreground">Instagram</span>
-                              {walkIn === null ? "—" : `₹${walkIn}`}
-                            </span>
-                            <span className="font-bold text-primary">
-                              <span className="block">Website first*</span>
-                              {website === null || !item.booking_enabled
-                                ? "—"
-                                : `₹${website - getWelcomeDiscount(website)}`}
-                            </span>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <span className="block text-[11px] text-muted-foreground">Original</span>
+                              <span className="font-semibold text-foreground">
+                                {website === null ? "—" : `₹${website}`}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-[11px] text-muted-foreground">Instagram</span>
+                              <span className="font-semibold text-foreground">
+                                {walkIn === null ? "—" : `₹${walkIn}`}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-[11px] text-muted-foreground">Website first*</span>
+                              <span className="font-bold text-primary">
+                                {website === null
+                                  ? "—"
+                                  : `₹${website - getWelcomeDiscount(website)}`}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                  <table className="mt-4 hidden w-full text-left text-xs sm:table">
+                  <table className="mt-5 hidden w-full text-left text-xs sm:table">
                     <thead className="border-b border-border uppercase text-muted-foreground">
                       <tr>
-                        <th className="py-3 pr-2">Time</th>
-                        <th className="py-3 pr-2">Original / repeat</th>
-                        <th className="py-3 pr-2">Instagram</th>
-                        <th className="py-3 text-primary">Website first*</th>
+                        <th className="py-3 pr-4 font-bold tracking-wider whitespace-nowrap">Time</th>
+                        <th className="py-3 pr-4 font-bold tracking-wider whitespace-nowrap">Original / repeat</th>
+                        <th className="py-3 pr-4 font-bold tracking-wider whitespace-nowrap">Instagram</th>
+                        <th className="py-3 font-bold tracking-wider text-primary whitespace-nowrap">Website first*</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {publicPriceBands.map((band) => (
-                        <tr key={band.time}>
-                          <td className="py-3 pr-2 font-semibold">{band.time}</td>
-                          <td className="py-3 pr-2">
+                        <tr key={band.time} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3.5 pr-4 font-semibold whitespace-nowrap">{band.time}</td>
+                          <td className="py-3.5 pr-4 text-foreground/90 whitespace-nowrap">
                             {item[band.website] === null ? "—" : `₹${item[band.website]}`}
                           </td>
-                          <td className="py-3 pr-2">
+                          <td className="py-3.5 pr-4 text-foreground/90 whitespace-nowrap">
                             {item[band.walkIn] === null ? "—" : `₹${item[band.walkIn]}`}
                           </td>
-                          <td className="py-3 font-bold text-primary">
-                            {item[band.website] === null || !item.booking_enabled
+                          <td className="py-3.5 font-bold text-primary whitespace-nowrap">
+                            {item[band.website] === null
                               ? "—"
                               : `₹${item[band.website]! - getWelcomeDiscount(item[band.website]!)}`}
                           </td>
@@ -1199,14 +1602,20 @@ function ArenaStories() {
                       ))}
                     </tbody>
                   </table>
+                  {item.is_coming_soon && (
+                    <div className="mt-4 rounded-md border border-dashed border-amber-500/35 bg-amber-500/10 p-3.5 text-center text-xs text-amber-500 font-semibold">
+                      ⚡ Coming Soon — Pitch setup underway. Online booking will be enabled shortly.
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              *₹150 off the first website booking per mobile number. The website prices above show
-              one hour with that offer. Repeat bookings use the original rates. For multiple hours,
-              ₹150 is deducted once from the total. Instagram rates are for Instagram followers. A
-              dash means online booking or that rate is unavailable.
+              *₹150 off with coupon code WELCOME150 on your first booking per mobile number. The
+              website prices above show one hour with that offer applied. Repeat bookings use the
+              standard rates. For multiple hours, ₹150 is deducted once from the total. Instagram
+              rates are for Instagram followers. A dash means online booking or that rate is
+              unavailable.
             </p>
           </div>
         </section>
@@ -1298,61 +1707,50 @@ function ArenaStories() {
                 >
                   {venues.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name}
+                      {item.name} {item.is_coming_soon ? "— Coming Soon" : ""}
                     </option>
                   ))}
                 </select>
-                {!venue.booking_enabled && (
-                  <p className="mt-3 border border-primary/30 bg-primary/10 p-3 text-sm">
-                    Full time-slot prices for this pitch are being confirmed. Call{" "}
-                    <a className="font-bold text-primary underline" href={ARENA_PHONE_HREF}>
-                      {ARENA_PHONE_DISPLAY}
-                    </a>{" "}
-                    to book it.
-                  </p>
-                )}
 
-                <div className="mt-8">
-                  <p className="text-xs font-bold uppercase text-muted-foreground">Select date</p>
-                  <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} />
-                </div>
+                {venue.is_coming_soon ? (
+                  <div className="mt-6 border border-dashed border-amber-500/40 bg-amber-500/10 p-6 sm:p-8 text-center">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-500">
+                      ⚡ Coming Soon
+                    </span>
+                    <h3 className="mt-3 font-display text-2xl sm:text-3xl text-foreground">
+                      {venue.name} Launching Soon!
+                    </h3>
+                    <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground leading-relaxed">
+                      This arena pitch and its hourly rates are currently being finalized. Online reservations will open shortly.
+                    </p>
+                    <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                      <Button
+                        variant="sport"
+                        onClick={() => {
+                          const activePitch = venues.find((v) => !v.is_coming_soon);
+                          if (activePitch) changeVenue(activePitch.id);
+                        }}
+                      >
+                        Book 5400 sq. ft. Pitch Instead
+                      </Button>
+                      <a
+                        href={ARENA_PHONE_HREF}
+                        className="inline-flex h-9 items-center justify-center rounded-sm border border-input bg-background px-4 text-xs font-bold uppercase text-foreground hover:border-primary hover:text-primary"
+                      >
+                        Call Arena ({ARENA_PHONE_DISPLAY})
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-8">
+                      <p className="text-xs font-bold uppercase text-muted-foreground">Select date</p>
+                      <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} />
+                    </div>
 
                 <p className="mt-5 text-sm font-semibold text-muted-foreground">
                   Select a starting hour below. Then choose how many consecutive hours to book.
                 </p>
-
-                {venue.booking_enabled && (
-                  <div
-                    aria-live="polite"
-                    className={`mt-5 border-l-4 px-4 py-4 sm:px-6 sm:py-5 ${offerAlreadyUsed ? "border-status-danger bg-status-danger/10" : "border-primary bg-primary/10"}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Sparkles
-                        aria-hidden="true"
-                        className={`mt-1 h-7 w-7 shrink-0 ${offerAlreadyUsed ? "text-status-danger" : "text-primary"}`}
-                      />
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                          First website booking offer
-                        </p>
-                        <p
-                          className={`mt-1 font-display text-3xl leading-tight sm:text-4xl ${offerAlreadyUsed ? "text-status-danger" : "text-primary"}`}
-                        >
-                          {offerAlreadyUsed
-                            ? "₹150 OFFER ALREADY USED"
-                            : "SAVE ₹150 ON YOUR FIRST BOOKING"}
-                        </p>
-                        <p className="mt-2 text-sm font-semibold text-foreground">
-                          {offerAlreadyUsed
-                            ? "This number has an existing booking or reservation. The rates shown below apply."
-                            : offerEligible
-                              ? "Your number qualifies. ₹150 comes off the total at checkout."
-                              : "Use a new mobile number at checkout. ₹150 comes off the total once, even if you book multiple hours."}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Slot grid */}
                 <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1379,8 +1777,8 @@ function ArenaStories() {
                           className={`h-20 min-w-0 flex-col gap-0.5 overflow-hidden px-1.5 sm:h-16 ${selected ? "ring-2 ring-primary ring-offset-2" : ""}`}
                           onClick={() => selectSlot(slot)}
                         >
-                          <span className="whitespace-nowrap text-xs font-bold sm:text-sm">
-                            {formatTime(slot.start_time)}
+                          <span className="whitespace-nowrap text-[11px] font-bold tracking-tight sm:text-xs">
+                            {formatSlotRange(slot.start_time, slot.duration_minutes ?? 60)}
                           </span>
                           {venue.booking_enabled && (
                             <span className="whitespace-nowrap text-base font-bold leading-tight">
@@ -1424,12 +1822,12 @@ function ArenaStories() {
                         id="duration-hours"
                         value={Math.min(durationHours, maxDuration)}
                         onChange={(event) => setDurationHours(Number(event.target.value))}
-                        className="h-12 min-w-40 border border-input bg-background px-4 font-bold outline-hidden focus:border-primary"
+                        className="h-12 w-full min-[480px]:w-auto min-[480px]:min-w-48 border border-input bg-background px-4 font-bold outline-hidden focus:border-primary text-xs sm:text-sm"
                       >
                         {Array.from({ length: maxDuration }, (_, index) => index + 1).map(
                           (hours) => (
                             <option key={hours} value={hours}>
-                              {hours} hour{hours === 1 ? "" : "s"} — ₹
+                              {hours} hour{hours === 1 ? "" : "s"} ({formatSlotRange(chosenSlot.start_time, hours * 60)}) — ₹
                               {getBookingPrice(
                                 venue,
                                 activeSlots.slice(chosenSlotIndex, chosenSlotIndex + hours),
@@ -1493,12 +1891,25 @@ function ArenaStories() {
                 <div className="mt-4">
                   <label
                     htmlFor="customer-phone"
-                    className="text-xs font-bold uppercase text-muted-foreground"
+                    className="flex items-center justify-between text-xs font-bold uppercase text-muted-foreground"
                   >
-                    Mobile number
+                    <span>Mobile number</span>
+                    {phoneChecking && (
+                      <span className="text-[11px] font-semibold text-primary animate-pulse">
+                        Verifying new user eligibility…
+                      </span>
+                    )}
                   </label>
-                  <div className="mt-2 flex h-12 min-w-0 border border-input bg-background focus-within:border-primary">
-                    <span className="flex shrink-0 items-center border-r border-input px-3 font-semibold">
+                  <div
+                    className={`mt-2 flex h-12 min-w-0 border bg-background transition-colors ${
+                      validPhone && offerEligible
+                        ? "border-primary"
+                        : validPhone && offerAlreadyUsed
+                          ? "border-status-danger"
+                          : "border-input focus-within:border-primary"
+                    }`}
+                  >
+                    <span className="flex shrink-0 items-center border-r border-input px-3 font-semibold text-muted-foreground">
                       +91
                     </span>
                     <input
@@ -1513,18 +1924,142 @@ function ArenaStories() {
                       autoComplete="tel-national"
                       maxLength={10}
                       required
-                      className="min-w-0 flex-1 bg-transparent px-4 outline-hidden placeholder:text-muted-foreground"
+                      className="min-w-0 flex-1 bg-transparent px-4 outline-hidden placeholder:text-muted-foreground font-semibold"
                     />
+                    {validPhone && (
+                      <div className="flex items-center pr-3">
+                        {phoneChecking ? (
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        ) : offerEligible ? (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        ) : offerAlreadyUsed ? (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-status-danger/10 text-status-danger">
+                            <X className="h-3.5 w-3.5" />
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Your first website booking with this mobile number gets ₹150 off the total.
-                  </p>
-                  {validPhone && welcomeEligibility?.phone === normalizedPhone && (
-                    <p className="mt-1 text-xs font-semibold text-primary">
-                      {welcomeEligibility.eligible
-                        ? "This number is eligible: ₹150 off your first booking."
-                        : "This number has been used already. The ₹150 offer is only for a first booking."}
+
+                  {/* Verification status feedback under phone */}
+                  {validPhone && welcomeEligibility?.phone === normalizedPhone ? (
+                    offerEligible ? (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-primary">
+                        <Check className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          Verified: New mobile number! You qualify for coupon{" "}
+                          <strong>WELCOME150</strong> (₹150 off).
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-status-danger">
+                        <X className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                          This mobile number (+91 {customerPhoneDigits}) already has bookings.
+                          Coupon WELCOME150 is only for first-time bookings with a new number.
+                        </span>
+                      </p>
+                    )
+                  ) : validPhone ? (
+                    <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-primary">
+                      <Check className="h-3.5 w-3.5 shrink-0" />
+                      <span>Valid 10-digit mobile number! WELCOME150 discount ready.</span>
                     </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Enter your mobile number to verify eligibility for the{" "}
+                      <strong>WELCOME150</strong> first-time booking discount.
+                    </p>
+                  )}
+                </div>
+
+                {/* ── Coupon Code ── */}
+                <div className="mt-5 border border-border bg-card p-4 sm:p-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <label
+                      htmlFor="coupon-code"
+                      className="flex items-center gap-2 text-xs font-bold uppercase text-muted-foreground"
+                    >
+                      <Tag className="h-4 w-4 text-primary" />
+                      <span>Have a coupon code?</span>
+                    </label>
+                    {appliedCoupon && (
+                      <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-bold uppercase text-primary">
+                        Coupon Applied
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      id="coupon-code"
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => {
+                        setCouponInput(e.target.value);
+                        setCouponError("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleApplyCoupon();
+                        }
+                      }}
+                      placeholder="Write coupon (e.g. WELCOME150)"
+                      disabled={Boolean(appliedCoupon)}
+                      className="h-12 min-w-0 flex-1 border border-input bg-background px-4 font-mono text-sm font-bold uppercase tracking-wider outline-hidden placeholder:font-sans placeholder:text-xs placeholder:font-normal placeholder:tracking-normal placeholder:text-muted-foreground focus:border-primary disabled:opacity-60"
+                    />
+                    {appliedCoupon ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={handleRemoveCoupon}
+                        className="h-12 border border-border px-4 text-xs font-bold text-status-danger hover:bg-status-danger/10"
+                      >
+                        Remove
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="sport"
+                        onClick={() => handleApplyCoupon()}
+                        className="h-12 px-6 text-xs font-bold uppercase"
+                      >
+                        Apply
+                      </Button>
+                    )}
+                  </div>
+
+                  {couponError && (
+                    <p className="mt-2 text-xs font-semibold text-status-danger">{couponError}</p>
+                  )}
+
+                  {appliedCoupon && welcomeDiscount > 0 ? (
+                    <div className="mt-3 flex items-center gap-2 rounded-sm bg-primary/10 p-3 text-xs font-semibold text-primary">
+                      <Check className="h-4 w-4 shrink-0" />
+                      <span>
+                        Coupon <strong>{appliedCoupon}</strong> applied! ₹{welcomeDiscount} discount is projected in your booking summary on the right.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2.5">
+                      <span className="text-xs text-muted-foreground">First-time booking offer:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyCoupon("WELCOME150")}
+                        className="group inline-flex items-center gap-1.5 rounded-sm border border-dashed border-primary/50 bg-primary/5 px-2.5 py-1 text-xs font-bold text-primary transition-colors hover:border-primary hover:bg-primary/10"
+                      >
+                        <span className="font-mono">WELCOME150</span>
+                        <span className="font-normal text-muted-foreground group-hover:text-primary">
+                          (₹150 off for new mobile numbers)
+                        </span>
+                        <span className="ml-1 text-[11px] font-bold uppercase text-primary underline">
+                          Apply
+                        </span>
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -1537,7 +2072,9 @@ function ArenaStories() {
                     {error}
                   </p>
                 )}
-              </div>
+              </>
+            )}
+          </div>
 
               {/* ── Right: summary + confirmation panel ── */}
               <aside
@@ -1564,13 +2101,12 @@ function ArenaStories() {
                       ))}
                     </div>
                     <p
-                      className={`mt-5 text-xs font-bold uppercase ${
-                        booking.payment_status === "paid"
+                      className={`mt-5 text-xs font-bold uppercase ${booking.payment_status === "paid"
                           ? "text-status-success"
                           : booking.payment_status === "failed"
                             ? "text-status-danger"
                             : "text-amber-500"
-                      }`}
+                        }`}
                     >
                       {booking.payment_status === "paid"
                         ? "Payment approved"
@@ -1607,6 +2143,9 @@ function ArenaStories() {
                         setSlotId("");
                         setDurationHours(1);
                         setPlayerName("");
+                        setAppliedCoupon(null);
+                        setCouponInput("");
+                        setCouponError("");
                       }}
                     >
                       Book another match
@@ -1684,8 +2223,18 @@ function ArenaStories() {
                 ) : (
                   /* ── Booking summary state ── */
                   <>
-                    <p className="text-xs font-bold uppercase text-primary">Booking summary</p>
-                    <h3 className="mt-2 font-display text-4xl">{venue.name}</h3>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold uppercase text-primary">Booking summary</p>
+                        <h3 className="mt-1 font-display text-3xl sm:text-4xl">{venue.name}</h3>
+                      </div>
+                      {chosenSlot && appliedCoupon && welcomeDiscount > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-[11px] font-bold uppercase text-primary">
+                          <Tag className="h-3 w-3" />
+                          −₹150 OFF
+                        </span>
+                      )}
+                    </div>
 
                     <div className="mt-6 space-y-4 border-y border-border py-5 text-sm">
                       <Summary
@@ -1700,31 +2249,89 @@ function ArenaStories() {
                         label="Kick-off"
                         value={
                           chosenSlot
-                            ? `${formatTime(chosenSlot.start_time)} · ${durationHours} hour${durationHours === 1 ? "" : "s"}`
+                            ? `${formatSlotRange(chosenSlot.start_time, durationHours * 60)} (${durationHours} hour${durationHours === 1 ? "" : "s"})`
                             : "Select a slot"
                         }
                       />
                       <Summary label="Squad" value={`${teamSize} players`} />
+                      {chosenSlot && (
+                        <Summary
+                          label="Pitch Fee"
+                          value={`₹${selectedPrice}${durationHours > 1 ? ` (${durationHours} hrs)` : ""}`}
+                        />
+                      )}
+                      {chosenSlot && appliedCoupon && welcomeDiscount > 0 && (
+                        <div className="flex items-center justify-between gap-5 font-semibold text-primary">
+                          <span className="flex items-center gap-1.5">
+                            <Tag className="h-3.5 w-3.5" />
+                            Coupon ({appliedCoupon})
+                          </span>
+                          <span>−₹{welcomeDiscount}</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex items-end justify-between py-6">
-                      <span className="text-sm text-muted-foreground">
-                        {welcomeDiscount > 0 ? (
-                          <>
-                            Website ₹{selectedPrice}
-                            <span className="block font-semibold text-primary">
-                              Welcome offer −₹{welcomeDiscount}
-                            </span>
-                          </>
+                    {/* Price Projection Area */}
+                    <div className="py-6">
+                      {chosenSlot ? (
+                        appliedCoupon && welcomeDiscount > 0 ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>Pitch Subtotal</span>
+                              <span>₹{selectedPrice}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs font-semibold text-primary">
+                              <span>New User Discount ({appliedCoupon})</span>
+                              <span>−₹{welcomeDiscount}</span>
+                            </div>
+                            <div className="flex items-end justify-between border-t border-border/60 pt-3">
+                              <div>
+                                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                  Total to Pay
+                                </span>
+                                <p className="text-[11px] font-semibold text-primary">
+                                  🎉 You save ₹{welcomeDiscount} with WELCOME150!
+                                </p>
+                              </div>
+                              <span className="font-display text-4xl sm:text-5xl text-foreground">
+                                ₹{checkoutPrice}
+                              </span>
+                            </div>
+                          </div>
                         ) : (
-                          "Total"
-                        )}
-                      </span>
-                      <span className="font-display text-5xl">
-                        {venue.booking_enabled
-                          ? `₹${chosenSlot ? checkoutPrice : getStartingPrice(venue)}`
-                          : "Call for pricing"}
-                      </span>
+                          <div className="flex items-end justify-between">
+                            <div>
+                              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                Total to Pay
+                              </span>
+                              {validPhone && offerEligible && !appliedCoupon && (
+                                <p className="text-[11px] font-semibold text-primary">
+                                  Tip: Apply WELCOME150 to save ₹150
+                                </p>
+                              )}
+                            </div>
+                            <span className="font-display text-4xl sm:text-5xl text-foreground">
+                              ₹{selectedPrice}
+                            </span>
+                          </div>
+                        )
+                      ) : (
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                              {venue.is_coming_soon ? "Pitch Status" : "Total"}
+                            </span>
+                            <p className="text-[11px] text-muted-foreground">
+                              {venue.is_coming_soon
+                                ? "Pricing and online booking launching soon"
+                                : "Select a time slot to view total"}
+                            </p>
+                          </div>
+                          <span className={`font-display ${venue.is_coming_soon ? "text-2xl text-amber-500" : "text-3xl sm:text-4xl text-muted-foreground/40"}`}>
+                            {venue.is_coming_soon ? "Coming Soon" : "—"}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <Button
@@ -1732,6 +2339,7 @@ function ArenaStories() {
                       variant="sport"
                       className="as-glow w-full"
                       disabled={
+                        venue.is_coming_soon ||
                         !venue.booking_enabled ||
                         submitting ||
                         !slotId ||
@@ -1740,17 +2348,19 @@ function ArenaStories() {
                       }
                       onClick={confirmBooking}
                     >
-                      {!venue.booking_enabled
-                        ? "Call for pricing to book this pitch"
-                        : submitting
-                          ? "Opening secure payment…"
-                          : !slotId
-                            ? "Select a time slot"
-                            : playerName.trim().length < 2
-                              ? "Enter the name on your UPI app"
-                              : !validPhone
-                                ? "Enter a valid mobile number"
-                                : `Pay ₹${checkoutPrice}`}{" "}
+                      {venue.is_coming_soon
+                        ? "Pitch Coming Soon"
+                        : !venue.booking_enabled
+                          ? "Call for pricing to book this pitch"
+                          : submitting
+                            ? "Opening secure payment…"
+                            : !slotId
+                              ? "Select a time slot"
+                              : playerName.trim().length < 2
+                                ? "Enter the name on your UPI app"
+                                : !validPhone
+                                  ? "Enter a valid mobile number"
+                                  : `Pay ₹${checkoutPrice}`}{" "}
                       <ArrowRight />
                     </Button>
 
@@ -1790,13 +2400,12 @@ function ArenaStories() {
                             <strong className="text-sm">₹{entry.amount}</strong>
                           </div>
                           <p
-                            className={`mt-2 text-xs font-semibold ${
-                              entry.paymentStatus === "paid"
+                            className={`mt-2 text-xs font-semibold ${entry.paymentStatus === "paid"
                                 ? "text-status-success"
                                 : entry.paymentStatus === "submitted"
                                   ? "text-amber-500"
                                   : "text-status-danger"
-                            }`}
+                              }`}
                           >
                             {entry.paymentStatus === "paid"
                               ? "Approved — slot booked"
@@ -1845,7 +2454,7 @@ function ArenaStories() {
                     <span className="text-primary drop-shadow-[0_2px_8px_rgba(34,197,94,0.35)]">ARENA</span>
                   </div>
                   <span className="mt-1 font-sans text-[10px] font-extrabold uppercase tracking-[0.24em] text-surface-inverse-foreground/60">
-                    Box Cricket · Visakhapatnam
+                    Box Cricket · Narsipatnam
                   </span>
                 </div>
               </div>
@@ -1861,7 +2470,7 @@ function ArenaStories() {
               </p>
             </div>
             <div className="text-xs uppercase text-surface-inverse-foreground/45">
-              © 2026 Stories Arena · Visakhapatnam
+              © 2026 Stories Arena · Narsipatnam
             </div>
           </div>
         </footer>
@@ -1952,11 +2561,11 @@ function SectionTitle({
 }
 
 /** A single label / value row in the booking summary panel */
-function Summary({ label, value }: { label: string; value: string }) {
+function Summary({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-5">
-      <span className="text-muted-foreground">{label}</span>
-      <strong className="text-right">{value}</strong>
+    <div className="flex items-start sm:items-center justify-between gap-3 text-xs sm:text-sm">
+      <span className="text-muted-foreground shrink-0">{label}</span>
+      <strong className="text-right break-words">{value}</strong>
     </div>
   );
 }

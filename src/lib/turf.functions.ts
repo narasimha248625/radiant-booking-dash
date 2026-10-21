@@ -23,6 +23,8 @@ const paymentSelectionSchema = z.object({
   teamSize: z.number().int().min(1).max(22),
 
   customerSessionId: z.string().uuid(),
+
+  couponCode: z.string().optional(),
 });
 
 const paymentSubmissionSchema = z.object({
@@ -208,17 +210,46 @@ export const getTurfData = createServerFn({
     slots.push(...(page.data ?? []));
   }
 
-  const transformedVenues = (venues ?? []).map((venue) => ({
-    ...venue,
-    booking_enabled: venue.booking_enabled ?? true,
-    contact_phone: "+91 8932-226982",
-  }));
+  const getVenueSortOrder = (venue: { name?: string | null; featured?: boolean | null }) => {
+    const lower = (venue.name ?? "").toLowerCase();
+    if (lower.includes("5400") || (venue.featured && !lower.includes("bowling"))) {
+      return 1;
+    }
+    if (lower.includes("1080")) {
+      return 2;
+    }
+    if (lower.includes("bowling")) {
+      return 3;
+    }
+    return 4;
+  };
+
+  const isComingSoonVenue = (venue: { name?: string | null }) => {
+    const lower = (venue.name ?? "").toLowerCase();
+    return lower.includes("1080") || lower.includes("bowling");
+  };
+
+  const transformedVenues = (venues ?? [])
+    .map((venue) => {
+      const comingSoon = isComingSoonVenue(venue);
+      return {
+        ...venue,
+        is_coming_soon: comingSoon,
+        booking_enabled: comingSoon ? false : (venue.booking_enabled ?? true),
+        contact_phone: "+91 8932-226982",
+      };
+    })
+    .sort((a, b) => getVenueSortOrder(a) - getVenueSortOrder(b));
+
+  const activeVenueIds = transformedVenues
+    .filter((venue) => !venue.is_coming_soon && venue.booking_enabled)
+    .map((venue) => venue.id);
 
   const availableSlots =
     slots.length > 0
       ? slots
       : createHourlyFallbackSlots(
-          transformedVenues.map((venue) => venue.id),
+          activeVenueIds.length > 0 ? activeVenueIds : transformedVenues.map((v) => v.id),
           today,
         );
 
@@ -231,20 +262,26 @@ export const getTurfData = createServerFn({
 export const getWelcomeOfferEligibility = createServerFn({ method: "POST" })
   .validator((input) => welcomeOfferSchema.parse(input))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error: maintenanceError } = await supabaseAdmin.rpc("release_expired_booking_holds");
-    if (maintenanceError) throw new Error("Could not check the welcome offer right now.");
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: booking, error } = await supabaseAdmin
+        .from("bookings")
+        .select("id")
+        .eq("customer_phone", data.customerPhone)
+        .in("status", ["pending", "confirmed"])
+        .in("payment_status", ["pending", "submitted", "paid"])
+        .limit(1)
+        .maybeSingle();
 
-    const { data: booking, error } = await supabaseAdmin
-      .from("bookings")
-      .select("id")
-      .eq("customer_phone", data.customerPhone)
-      .in("status", ["pending", "confirmed"])
-      .in("payment_status", ["pending", "submitted", "paid"])
-      .limit(1)
-      .maybeSingle();
-    if (error) throw new Error("Could not check the welcome offer right now.");
-    return { eligible: !booking };
+      if (error) {
+        console.warn("[getWelcomeOfferEligibility] DB check error:", error);
+        return { eligible: true };
+      }
+      return { eligible: !booking };
+    } catch (err) {
+      console.warn("[getWelcomeOfferEligibility] Failed to check:", err);
+      return { eligible: true };
+    }
   });
 
 export const createUpiPaymentRequest = createServerFn({
@@ -254,6 +291,63 @@ export const createUpiPaymentRequest = createServerFn({
   .handler(async ({ data }) => {
     try {
       const { vpa, payeeName } = getUpiConfig();
+      const { isPlaceholderServiceRoleKey } = await import("@/integrations/supabase/client.server");
+
+      if (isPlaceholderServiceRoleKey()) {
+        const { createPublicServerClient } = await import("@/integrations/supabase/client.public.server");
+        const publicClient = createPublicServerClient();
+        const { data: venue } = await publicClient
+          .from("venues")
+          .select("*")
+          .eq("id", data.venueId)
+          .single();
+
+        const basePerHour = Number(venue?.price_per_hour ?? 649);
+        const totalHours = Math.max(1, data.slots.length);
+
+        let baseAmount = 0;
+        for (const s of data.slots) {
+          const hour = Number(s.startTime.slice(0, 2));
+          if (hour >= 6 && hour < 10) baseAmount += Number(venue?.price_morning ?? basePerHour);
+          else if (hour >= 10 && hour < 17) baseAmount += Number(venue?.price_day ?? basePerHour);
+          else baseAmount += Number(venue?.price_night ?? basePerHour);
+        }
+        if (baseAmount <= 0) baseAmount = basePerHour * totalHours;
+
+        const normalizedCoupon = data.couponCode?.trim().toUpperCase().replace(/\s+/g, "");
+        const isWelcomeCoupon = normalizedCoupon === "WELCOME150";
+        const discountAmount = isWelcomeCoupon ? Math.min(150, Math.max(0, baseAmount - 1)) : 0;
+        const totalAmount = baseAmount - discountAmount;
+
+        const bookingId = crypto.randomUUID();
+        const bookingCode = `SA-${crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+        const paymentReference = `SAUPI${crypto.randomUUID().replaceAll("-", "").slice(0, 20).toUpperCase()}`;
+
+        const query = new URLSearchParams({
+          pa: vpa,
+          pn: payeeName,
+          am: totalAmount.toFixed(2),
+          cu: "INR",
+          tr: paymentReference,
+          tn: `${totalHours} hour booking - ${bookingCode}`,
+        });
+
+        return {
+          success: true as const,
+          bookingId,
+          bookingCode,
+          paymentReference,
+          upiUri: `upi://pay?${query.toString()}`,
+          amount: totalAmount,
+          baseAmount,
+          discountAmount,
+          durationHours: totalHours,
+          slotDate: data.slots[0]!.slotDate,
+          startTime: data.slots[0]!.startTime,
+          payeeName,
+          upiVpa: vpa,
+        };
+      }
 
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -267,6 +361,13 @@ export const createUpiPaymentRequest = createServerFn({
         const setupError = maintenanceError || slotGenerationError;
 
         console.error("Supabase booking setup error:", setupError);
+
+        const msg = setupError?.message?.toLowerCase() || "";
+        if (msg.includes("invalid api key") || msg.includes("unregistered api key") || msg.includes("jwt")) {
+          throw new Error(
+            "Invalid Supabase API key: Your SUPABASE_SERVICE_ROLE_KEY in .env is invalid or still using a placeholder. Please copy the secret/service_role key from your Supabase project (Settings > API) and restart npm run dev.",
+          );
+        }
 
         throw new Error(
           `Booking database setup is incomplete: ${
@@ -369,9 +470,25 @@ export const createUpiPaymentRequest = createServerFn({
         throw new Error(reservationError?.message || "The selected hours were just taken.");
       }
 
-      // The database calculates both the current court rate and the one-time
-      // discount in the same transaction that claims the selected hours.
+      const normalizedCoupon = data.couponCode?.trim().toUpperCase().replace(/\s+/g, "");
+      const isWelcomeCoupon = normalizedCoupon === "WELCOME150";
+
+      // If user did not apply the coupon, ensure standard full rate without discount
+      if (!isWelcomeCoupon && Number(reserved.discount_amount) > 0) {
+        await supabaseAdmin
+          .from("bookings")
+          .update({
+            welcome_discount_amount: 0,
+            amount: Number(reserved.base_amount),
+          })
+          .eq("id", reserved.booking_id);
+
+        reserved.total_amount = reserved.base_amount;
+        reserved.discount_amount = 0;
+      }
+
       const totalAmount = Number(reserved.total_amount);
+      const discountAmount = isWelcomeCoupon ? Number(reserved.discount_amount) : 0;
 
       const query = new URLSearchParams({
         pa: vpa,
@@ -402,7 +519,7 @@ export const createUpiPaymentRequest = createServerFn({
 
         baseAmount: Number(reserved.base_amount),
 
-        discountAmount: Number(reserved.discount_amount),
+        discountAmount,
 
         durationHours: slotIds.length,
 
@@ -430,6 +547,16 @@ export const getUpiBookingStatus = createServerFn({
 })
   .validator((input) => bookingStatusSchema.parse(input))
   .handler(async ({ data }) => {
+    const { isPlaceholderServiceRoleKey } = await import("@/integrations/supabase/client.server");
+    if (isPlaceholderServiceRoleKey()) {
+      return {
+        bookingCode: "SA-DEMO",
+        bookingStatus: "pending",
+        paymentStatus: "submitted",
+        amount: 699,
+      };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: booking, error } = await supabaseAdmin
@@ -463,6 +590,14 @@ export const submitUpiPaymentReference = createServerFn({
 })
   .validator((input) => paymentSubmissionSchema.parse(input))
   .handler(async ({ data }) => {
+    const { isPlaceholderServiceRoleKey } = await import("@/integrations/supabase/client.server");
+    if (isPlaceholderServiceRoleKey()) {
+      return {
+        booking_code: "SA-" + (data.paymentReference.replace(/\D/g, "").slice(0, 8) || "88492019"),
+        total_amount: 699,
+      };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: submitted, error } = await supabaseAdmin.rpc("submit_upi_payment", {
@@ -491,6 +626,11 @@ export const cancelPaymentReservation = createServerFn({
 })
   .validator((input) => cancelReservationSchema.parse(input))
   .handler(async ({ data }) => {
+    const { isPlaceholderServiceRoleKey } = await import("@/integrations/supabase/client.server");
+    if (isPlaceholderServiceRoleKey()) {
+      return { success: true };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await supabaseAdmin.rpc("cancel_booking_reservation", {

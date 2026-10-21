@@ -93,7 +93,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Book box cricket pitches in Visakhapatnam. Live slot availability and instant booking confirmation.",
+          "Book box cricket pitches in Narsipatnam. Live slot availability and instant booking confirmation.",
       },
       { name: "author", content: "Stories Arena" },
       /* ── Open Graph ── */
