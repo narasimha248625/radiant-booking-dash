@@ -1209,47 +1209,72 @@ function ArenaStories() {
                           : ""
                       }`}
                     >
-                      {activeSlots.filter(isSlotAvailable).length > 0 ? (
+                      {activeSlots.length > 0 ? (
                         (() => {
-                          const availableHeroSlots = activeSlots.filter(isSlotAvailable);
-                          const shouldTruncate = !heroSlotsExpanded && availableHeroSlots.length > 8;
+                          const shouldTruncate = !heroSlotsExpanded && activeSlots.length > 8;
                           const displayedSlots = shouldTruncate
-                            ? availableHeroSlots.slice(0, 8)
-                            : availableHeroSlots;
+                            ? activeSlots.slice(0, 8)
+                            : activeSlots;
 
                           return (
                             <>
-                              {displayedSlots.map((slot) => (
-                                <Button
-                                  key={slot.id}
-                                  disabled={!venue.booking_enabled}
-                                  variant={slot.id === slotId ? "sport" : "ghost"}
-                                  className={`h-[3.75rem] min-w-0 px-1.5 sm:px-2 py-2 border text-center font-bold leading-tight rounded-md ${
-                                    slot.id === slotId
-                                      ? "border-primary"
-                                      : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
-                                  }`}
-                                  onClick={() => {
-                                    if (slot.id === slotId) {
-                                      setSlotId("");
-                                      setDurationHours(1);
-                                    } else {
-                                      setSlotId(slot.id);
-                                      setDurationHours(1);
-                                      setBooking(null);
+                              {displayedSlots.map((slot) => {
+                                const available = isSlotAvailable(slot);
+                                const isBooked = !available;
+                                const isSelected = slot.id === slotId;
+                                const unavailable = isBooked || !venue.booking_enabled;
+
+                                return (
+                                  <Button
+                                    key={slot.id}
+                                    disabled={unavailable}
+                                    variant={isSelected ? "sport" : "ghost"}
+                                    title={
+                                      isBooked
+                                        ? `${getSlotStartTime(slot.start_time)} to ${getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)} (${slot.status === "held" ? "Approval pending" : "Booked"})`
+                                        : undefined
                                     }
-                                  }}
-                                >
-                                  <span className="flex flex-col items-center justify-center w-full min-w-0 gap-0.5 leading-tight">
-                                    <span className="text-[11px] min-[360px]:text-xs sm:text-[13px] font-bold tracking-tight whitespace-nowrap">
-                                      {getSlotStartTime(slot.start_time)}
-                                    </span>
-                                    <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-semibold opacity-75 whitespace-nowrap">
-                                      to {getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)}
-                                    </span>
-                                  </span>
-                                </Button>
-                              ))}
+                                    className={`h-[3.75rem] min-w-0 px-1.5 sm:px-2 py-2 border text-center font-bold leading-tight rounded-md transition-colors ${
+                                      isSelected
+                                        ? "border-primary"
+                                        : isBooked
+                                          ? "border-rose-500/25 bg-rose-500/5 text-hero-muted disabled:opacity-85 cursor-not-allowed"
+                                          : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
+                                    }`}
+                                    onClick={() => {
+                                      if (isBooked || !venue.booking_enabled) return;
+                                      if (slot.id === slotId) {
+                                        setSlotId("");
+                                        setDurationHours(1);
+                                      } else {
+                                        setSlotId(slot.id);
+                                        setDurationHours(1);
+                                        setBooking(null);
+                                      }
+                                    }}
+                                  >
+                                    {isBooked ? (
+                                      <span className="flex flex-col items-center justify-center w-full min-w-0 gap-0.5 leading-tight">
+                                        <span className="text-[11px] min-[360px]:text-xs sm:text-[13px] font-bold tracking-tight whitespace-nowrap line-through decoration-rose-500/70 text-hero-muted/80">
+                                          {getSlotStartTime(slot.start_time)}
+                                        </span>
+                                        <span className="text-[8.5px] min-[360px]:text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded-[2px] leading-none whitespace-nowrap">
+                                          {slot.status === "held" ? "Hold" : "Booked"}
+                                        </span>
+                                      </span>
+                                    ) : (
+                                      <span className="flex flex-col items-center justify-center w-full min-w-0 gap-0.5 leading-tight">
+                                        <span className="text-[11px] min-[360px]:text-xs sm:text-[13px] font-bold tracking-tight whitespace-nowrap">
+                                          {getSlotStartTime(slot.start_time)}
+                                        </span>
+                                        <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-semibold opacity-75 whitespace-nowrap">
+                                          to {getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)}
+                                        </span>
+                                      </span>
+                                    )}
+                                  </Button>
+                                );
+                              })}
 
                               {shouldTruncate ? (
                                 <Button
@@ -1262,15 +1287,15 @@ function ArenaStories() {
                                     Show more <ChevronDown className="h-3 w-3 shrink-0" />
                                   </span>
                                   <span className="text-[8.5px] min-[360px]:text-[9.5px] font-normal opacity-80 whitespace-nowrap">
-                                    +{availableHeroSlots.length - 8} more
+                                    +{activeSlots.length - 8} more
                                   </span>
                                 </Button>
-                              ) : availableHeroSlots.length === 8 ? (
+                              ) : activeSlots.length === 8 ? (
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   onClick={jumpToBooking}
-                                  className="h-14 min-w-0 px-1 py-1 border border-dashed border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10 text-[10px] min-[360px]:text-[11px] font-bold flex flex-col items-center justify-center gap-0.5 leading-tight"
+                                  className="h-[3.75rem] min-w-0 px-1 py-1 border border-dashed border-primary/40 bg-primary/5 text-primary hover:border-primary hover:bg-primary/10 text-[10px] min-[360px]:text-[11px] font-bold flex flex-col items-center justify-center gap-0.5 leading-tight rounded-md"
                                 >
                                   <span className="flex items-center justify-center gap-1 font-bold whitespace-nowrap">
                                     Show more <ArrowRight className="h-3 w-3 shrink-0" />
@@ -1281,12 +1306,12 @@ function ArenaStories() {
                                 </Button>
                               ) : null}
 
-                              {heroSlotsExpanded && availableHeroSlots.length > 8 && (
+                              {heroSlotsExpanded && activeSlots.length > 8 && (
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   onClick={() => setHeroSlotsExpanded(false)}
-                                  className="h-14 min-w-0 px-1 py-1 border border-dashed border-hero-foreground/30 bg-hero/20 text-hero-muted hover:text-hero-foreground text-[10px] min-[360px]:text-[11px] font-bold flex items-center justify-center gap-1 leading-tight whitespace-nowrap"
+                                  className="h-[3.75rem] min-w-0 px-1 py-1 border border-dashed border-hero-foreground/30 bg-hero/20 text-hero-muted hover:text-hero-foreground text-[10px] min-[360px]:text-[11px] font-bold flex items-center justify-center gap-1 leading-tight whitespace-nowrap rounded-md"
                                 >
                                   <span>Show less</span>
                                   <ChevronUp className="h-3.5 w-3.5 shrink-0" />
@@ -1763,6 +1788,7 @@ function ArenaStories() {
                   ) : (
                     activeSlots.map((slot) => {
                       const available = isSlotAvailable(slot);
+                      const isBooked = !available && venue.booking_enabled;
                       const unavailable = !available || !venue.booking_enabled;
                       const selected = selectedSlots.some(
                         (selectedSlot) => selectedSlot.id === slot.id,
@@ -1774,18 +1800,43 @@ function ArenaStories() {
                           variant={selected ? "sport" : "sportOutline"}
                           disabled={unavailable}
                           aria-pressed={selected}
-                          className={`h-20 min-w-0 flex-col gap-0.5 overflow-hidden px-1.5 sm:h-16 ${selected ? "ring-2 ring-primary ring-offset-2" : ""}`}
+                          title={
+                            isBooked
+                              ? `${formatSlotRange(slot.start_time, slot.duration_minutes ?? 60)} (${slot.status === "held" ? "Approval pending" : "Booked"})`
+                              : undefined
+                          }
+                          className={`h-20 min-w-0 flex-col gap-0.5 overflow-hidden px-1.5 sm:h-16 ${
+                            selected ? "ring-2 ring-primary ring-offset-2" : ""
+                          } ${
+                            isBooked
+                              ? "border-rose-500/30 bg-rose-500/5 disabled:opacity-85 cursor-not-allowed"
+                              : ""
+                          }`}
                           onClick={() => selectSlot(slot)}
                         >
-                          <span className="whitespace-nowrap text-[11px] font-bold tracking-tight sm:text-xs">
+                          <span
+                            className={`whitespace-nowrap text-[11px] font-bold tracking-tight sm:text-xs ${
+                              isBooked ? "line-through opacity-70 decoration-rose-500/60" : ""
+                            }`}
+                          >
                             {formatSlotRange(slot.start_time, slot.duration_minutes ?? 60)}
                           </span>
                           {venue.booking_enabled && (
-                            <span className="whitespace-nowrap text-base font-bold leading-tight">
+                            <span
+                              className={`whitespace-nowrap text-base font-bold leading-tight ${
+                                isBooked ? "opacity-40 line-through text-muted-foreground" : ""
+                              }`}
+                            >
                               ₹{getHourPrice(venue, slot.start_time)}
                             </span>
                           )}
-                          <span className="max-w-full text-center text-[10px] leading-tight normal-case opacity-65">
+                          <span
+                            className={`max-w-full text-center text-[10px] leading-tight normal-case ${
+                              isBooked
+                                ? "font-black uppercase tracking-wider text-rose-500 opacity-100"
+                                : "opacity-65"
+                            }`}
+                          >
                             {!venue.booking_enabled
                               ? "Call for price"
                               : slot.status === "booked" || slot.reserved_count >= slot.capacity
