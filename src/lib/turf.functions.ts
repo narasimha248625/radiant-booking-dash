@@ -126,7 +126,7 @@ export const getTurfData = createServerFn({
   const supabase = createPublicServerClient();
 
   const today = indiaDate();
-
+  const startDate = indiaDate(new Date(Date.now() - 86_400_000));
   const throughDate = indiaDate(new Date(Date.now() + 60 * 86_400_000));
 
   // IMPORTANT:
@@ -175,7 +175,7 @@ export const getTurfData = createServerFn({
   const firstPage = await supabase
     .from("slots")
     .select("*")
-    .gte("slot_date", today)
+    .gte("slot_date", startDate)
     .lte("slot_date", throughDate)
     .order("slot_date")
     .order("start_time")
@@ -194,7 +194,7 @@ export const getTurfData = createServerFn({
     const page = await supabase
       .from("slots")
       .select("*")
-      .gte("slot_date", today)
+      .gte("slot_date", startDate)
       .lte("slot_date", throughDate)
       .order("slot_date")
       .order("start_time")
@@ -250,7 +250,7 @@ export const getTurfData = createServerFn({
       ? slots
       : createHourlyFallbackSlots(
           activeVenueIds.length > 0 ? activeVenueIds : transformedVenues.map((v) => v.id),
-          today,
+          startDate,
         );
 
   return {
@@ -264,12 +264,14 @@ export const getWelcomeOfferEligibility = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      // Only consider mobile numbers with completed/submitted payments as ineligible
+      // Unsubmitted pending holds (where user hasn't paid or submitted UTR) remain eligible
       const { data: booking, error } = await supabaseAdmin
         .from("bookings")
         .select("id")
         .eq("customer_phone", data.customerPhone)
-        .in("status", ["pending", "confirmed"])
-        .in("payment_status", ["pending", "submitted", "paid"])
+        .neq("status", "cancelled")
+        .in("payment_status", ["submitted", "paid"])
         .limit(1)
         .maybeSingle();
 
@@ -388,24 +390,25 @@ export const createUpiPaymentRequest = createServerFn({
       // Resolve those visible hours to their real
       // database rows before reserving.
       if (!slotError && selectedSlots?.length !== data.slots.length) {
-        const dates = [...new Set(data.slots.map((slot) => slot.slotDate))];
-
-        const courts = [...new Set(data.slots.map((slot) => slot.courtLabel))];
-
-        const times = data.slots.map((slot) => slot.startTime);
-
-        if (dates.length === 1 && courts.length === 1) {
-          const resolved = await supabaseAdmin
+        const resolvedSlots: typeof selectedSlots = [];
+        for (const reqSlot of data.slots) {
+          const { data: matched } = await supabaseAdmin
             .from("slots")
             .select("id, venue_id, slot_date, start_time, status, capacity, reserved_count")
             .eq("venue_id", data.venueId)
-            .eq("slot_date", dates[0]!)
-            .eq("court_label", courts[0]!)
-            .in("start_time", times);
+            .eq("slot_date", reqSlot.slotDate)
+            .eq("court_label", reqSlot.courtLabel)
+            .eq("start_time", reqSlot.startTime)
+            .maybeSingle();
 
-          selectedSlots = resolved.data;
+          if (matched) {
+            resolvedSlots.push(matched);
+          }
+        }
 
-          slotError = resolved.error;
+        if (resolvedSlots.length === data.slots.length) {
+          selectedSlots = resolvedSlots;
+          slotError = null;
         }
       }
 
@@ -426,6 +429,13 @@ export const createUpiPaymentRequest = createServerFn({
         throw new Error("The selected hour has already started. Choose a future slot.");
       }
 
+      // Sort selected slots chronologically so the first slot is always the earliest
+      selectedSlots.sort(
+        (a, b) =>
+          new Date(`${a.slot_date}T${a.start_time}+05:30`).getTime() -
+          new Date(`${b.slot_date}T${b.start_time}+05:30`).getTime(),
+      );
+
       const slotIds = selectedSlots.map((slot) => slot.id);
 
       const { data: venue, error: venueError } = await supabaseAdmin
@@ -437,6 +447,29 @@ export const createUpiPaymentRequest = createServerFn({
 
       if (venueError || !venue || venue.booking_enabled === false) {
         throw new Error("This arena is currently unavailable.");
+      }
+
+      // Release any unsubmitted pending holds for this customer session or phone so they can re-select slots or retry
+      try {
+        const { data: abandonedBookings } = await supabaseAdmin
+          .from("bookings")
+          .select("id, payment_reference")
+          .or(`customer_session_id.eq.${data.customerSessionId},customer_phone.eq.${data.customerPhone}`)
+          .eq("status", "pending")
+          .eq("payment_status", "pending");
+
+        if (abandonedBookings && abandonedBookings.length > 0) {
+          for (const b of abandonedBookings) {
+            if (b.payment_reference) {
+              await supabaseAdmin.rpc("cancel_booking_reservation", {
+                p_booking_id: b.id,
+                p_payment_reference: b.payment_reference,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[createUpiPaymentRequest] Failed to cleanup unsubmitted pending holds:", err);
       }
 
       const paymentReference = `SAUPI${crypto
@@ -473,8 +506,51 @@ export const createUpiPaymentRequest = createServerFn({
       const normalizedCoupon = data.couponCode?.trim().toUpperCase().replace(/\s+/g, "");
       const isWelcomeCoupon = normalizedCoupon === "WELCOME150";
 
-      // If user did not apply the coupon, ensure standard full rate without discount
-      if (!isWelcomeCoupon && Number(reserved.discount_amount) > 0) {
+      if (isWelcomeCoupon) {
+        // Double check against database: has this mobile number actually completed a payment?
+        // Only payments that were submitted with a UTR or approved as paid disqualify the welcome coupon.
+        const { data: priorPaidBooking } = await supabaseAdmin
+          .from("bookings")
+          .select("id")
+          .eq("customer_phone", data.customerPhone)
+          .neq("id", reserved.booking_id)
+          .neq("status", "cancelled")
+          .in("payment_status", ["submitted", "paid"])
+          .limit(1)
+          .maybeSingle();
+
+        if (priorPaidBooking) {
+          // Mobile number already completed a payment previously: revoke discount
+          if (Number(reserved.discount_amount) > 0) {
+            await supabaseAdmin
+              .from("bookings")
+              .update({
+                welcome_discount_amount: 0,
+                amount: Number(reserved.base_amount),
+              })
+              .eq("id", reserved.booking_id);
+
+            reserved.total_amount = reserved.base_amount;
+            reserved.discount_amount = 0;
+          }
+        } else {
+          // Qualified new mobile number: ensure the ₹150 welcome discount is applied
+          const expectedDiscount = Math.min(150, Math.max(0, Number(reserved.base_amount) - 1));
+          if (Number(reserved.discount_amount) !== expectedDiscount) {
+            await supabaseAdmin
+              .from("bookings")
+              .update({
+                welcome_discount_amount: expectedDiscount,
+                amount: Number(reserved.base_amount) - expectedDiscount,
+              })
+              .eq("id", reserved.booking_id);
+
+            reserved.discount_amount = expectedDiscount;
+            reserved.total_amount = Number(reserved.base_amount) - expectedDiscount;
+          }
+        }
+      } else if (Number(reserved.discount_amount) > 0) {
+        // User did not apply coupon, ensure standard full rate without discount
         await supabaseAdmin
           .from("bookings")
           .update({
@@ -523,9 +599,9 @@ export const createUpiPaymentRequest = createServerFn({
 
         durationHours: slotIds.length,
 
-        slotDate: data.slots[0]!.slotDate,
+        slotDate: selectedSlots[0]!.slot_date,
 
-        startTime: data.slots[0]!.startTime,
+        startTime: selectedSlots[0]!.start_time,
 
         payeeName,
 

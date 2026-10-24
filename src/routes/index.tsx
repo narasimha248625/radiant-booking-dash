@@ -200,6 +200,37 @@ function formatDay(value: string) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
+/**
+ * Returns the operational match date for a slot.
+ * In 24/7 box cricket turf operations, each match day begins at 6:00 AM
+ * and extends through the night past midnight up to 6:00 AM the next morning.
+ * Slots between 00:00:00 and 05:59:59 belong to the previous calendar day's night session.
+ */
+function getOperationalDate(slotDate: string, startTime: string): string {
+  const hour = Number(startTime.slice(0, 2));
+  if (hour < 6) {
+    const [y, m, d] = slotDate.split("-").map(Number);
+    const date = new Date(Date.UTC(y!, m! - 1, d!));
+    date.setUTCDate(date.getUTCDate() - 1);
+    const prevY = date.getUTCFullYear();
+    const prevM = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const prevD = String(date.getUTCDate()).padStart(2, "0");
+    return `${prevY}-${prevM}-${prevD}`;
+  }
+  return slotDate;
+}
+
+/** Short day label (e.g. "Sun") if slot date differs from selected match date */
+function getSlotDayLabel(
+  slot: { slot_date: string; start_time: string },
+  baseDate: string,
+): string {
+  if (slot.slot_date === baseDate) return "";
+  return new Intl.DateTimeFormat("en-IN", { weekday: "short" }).format(
+    new Date(`${slot.slot_date}T12:00:00`),
+  );
+}
+
 /* ─────────────────────────────────────────────────────────
    Main component
    ───────────────────────────────────────────────────────── */
@@ -337,15 +368,36 @@ function ArenaStories() {
     [mergedSlots, venueId, currentTime],
   );
 
-  /* Unique sorted dates for the selected venue */
-  const days = [...new Set(venueSlots.map((slot) => slot.slot_date))].sort();
+  /* Unique sorted operational dates for the selected venue (each match day runs from 6:00 AM to 6:00 AM next morning) */
+  const days = useMemo(() => {
+    const set = new Set<string>();
+    for (const slot of venueSlots) {
+      set.add(getOperationalDate(slot.slot_date, slot.start_time));
+    }
+    return [...set].sort();
+  }, [venueSlots]);
+
   const [selectedDate, setSelectedDate] = useState("");
   const activeDate = days.includes(selectedDate) ? selectedDate : (days[0] ?? "");
-  const slotsForDate = venueSlots.filter((slot) => slot.slot_date === activeDate);
+  const slotsForDate = useMemo(
+    () =>
+      venueSlots.filter(
+        (slot) => getOperationalDate(slot.slot_date, slot.start_time) === activeDate,
+      ),
+    [venueSlots, activeDate],
+  );
   const hasMainCourt = slotsForDate.some((slot) => slot.court_label === "Main");
-  const activeSlots = slotsForDate
-    .filter((slot) => !hasMainCourt || slot.court_label === "Main")
-    .sort((left, right) => left.start_time.localeCompare(right.start_time));
+  const activeSlots = useMemo(
+    () =>
+      slotsForDate
+        .filter((slot) => !hasMainCourt || slot.court_label === "Main")
+        .sort(
+          (left, right) =>
+            new Date(`${left.slot_date}T${left.start_time}+05:30`).getTime() -
+            new Date(`${right.slot_date}T${right.start_time}+05:30`).getTime(),
+        ),
+    [slotsForDate, hasMainCourt],
+  );
 
   /* ── Booking form state ── */
   const [slotId, setSlotId] = useState("");
@@ -583,14 +635,16 @@ function ArenaStories() {
   const maxDuration = useMemo(() => {
     if (chosenSlotIndex < 0) return 1;
     let count = 0;
+    const startSlot = activeSlots[chosenSlotIndex]!;
+    const startMs = new Date(`${startSlot.slot_date}T${startSlot.start_time}+05:30`).getTime();
     for (let index = chosenSlotIndex; index < activeSlots.length; index += 1) {
       const slot = activeSlots[index]!;
-      const expectedHour =
-        (Number(activeSlots[chosenSlotIndex]!.start_time.slice(0, 2)) + count) % 24;
+      const slotMs = new Date(`${slot.slot_date}T${slot.start_time}+05:30`).getTime();
+      const expectedMs = startMs + count * 3600_000;
       if (
         count >= 3 ||
         !isSlotAvailable(slot) ||
-        Number(slot.start_time.slice(0, 2)) !== expectedHour
+        slotMs !== expectedMs
       ) {
         break;
       }
@@ -722,9 +776,11 @@ function ArenaStories() {
       const isContinuous = range.every((item, index) => {
         if (!isSlotAvailable(item)) return false;
         if (index === 0) return true;
-        const previousHour = Number(range[index - 1]!.start_time.slice(0, 2));
-        const currentHour = Number(item.start_time.slice(0, 2));
-        return currentHour === previousHour + 1;
+        const prevMs = new Date(
+          `${range[index - 1]!.slot_date}T${range[index - 1]!.start_time}+05:30`,
+        ).getTime();
+        const currMs = new Date(`${item.slot_date}T${item.start_time}+05:30`).getTime();
+        return currMs - prevMs === 3600_000;
       });
 
       if (isContinuous) {
@@ -1197,7 +1253,13 @@ function ArenaStories() {
                 ) : (
                   <>
                     <div className="mt-5">
-                      <p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-semibold uppercase text-hero-muted">Match date</p>
+                        <span className="text-[9px] font-semibold text-emerald-400 flex items-center gap-1">
+                          <Moon className="h-2.5 w-2.5" />
+                          <span>Slots open till 6:00 AM</span>
+                        </span>
+                      </div>
                       <MatchDatePicker days={days} activeDate={activeDate} onSelect={selectDate} hero />
                     </div>
 
@@ -1231,15 +1293,17 @@ function ArenaStories() {
                                     variant={isSelected ? "sport" : "ghost"}
                                     title={
                                       isBooked
-                                        ? `${getSlotStartTime(slot.start_time)} to ${getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)} (${slot.status === "held" ? "Approval pending" : "Booked"})`
-                                        : undefined
+                                        ? `${getSlotStartTime(slot.start_time)} to ${getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)} (${slot.status === "held" ? "Approval pending" : "Booked"})${slot.slot_date !== activeDate ? ` · Next Day (${getSlotDayLabel(slot, activeDate)})` : ""}`
+                                        : `${getSlotStartTime(slot.start_time)} to ${getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)}${slot.slot_date !== activeDate ? ` · Next Day (${getSlotDayLabel(slot, activeDate)})` : ""}`
                                     }
                                     className={`h-[3.75rem] min-w-0 px-1.5 sm:px-2 py-2 border text-center font-bold leading-tight rounded-md transition-colors ${
                                       isSelected
                                         ? "border-primary"
                                         : isBooked
                                           ? "border-rose-500/25 bg-rose-500/5 text-hero-muted disabled:opacity-85 cursor-not-allowed"
-                                          : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
+                                          : slot.slot_date !== activeDate
+                                            ? "border-emerald-500/30 bg-emerald-500/5 text-hero-foreground hover:border-primary hover:bg-emerald-500/10 hover:text-primary"
+                                            : "border-hero-foreground/20 text-hero-foreground hover:border-primary hover:bg-transparent hover:text-primary"
                                     }`}
                                     onClick={() => {
                                       if (isBooked || !venue.booking_enabled) return;
@@ -1260,6 +1324,7 @@ function ArenaStories() {
                                         </span>
                                         <span className="text-[8.5px] min-[360px]:text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded-[2px] leading-none whitespace-nowrap">
                                           {slot.status === "held" ? "Hold" : "Booked"}
+                                          {slot.slot_date !== activeDate ? ` · ${getSlotDayLabel(slot, activeDate)}` : ""}
                                         </span>
                                       </span>
                                     ) : (
@@ -1267,8 +1332,13 @@ function ArenaStories() {
                                         <span className="text-[11px] min-[360px]:text-xs sm:text-[13px] font-bold tracking-tight whitespace-nowrap">
                                           {getSlotStartTime(slot.start_time)}
                                         </span>
-                                        <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-semibold opacity-75 whitespace-nowrap">
-                                          to {getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)}
+                                        <span className="text-[9px] min-[360px]:text-[10px] sm:text-[11px] font-semibold opacity-85 whitespace-nowrap flex items-center justify-center gap-1">
+                                          <span>to {getSlotEndTime(slot.start_time, slot.duration_minutes ?? 60)}</span>
+                                          {slot.slot_date !== activeDate && (
+                                            <span className="text-[7.5px] min-[360px]:text-[8px] font-black uppercase px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 leading-none">
+                                              +{getSlotDayLabel(slot, activeDate)}
+                                            </span>
+                                          )}
                                         </span>
                                       </span>
                                     )}
@@ -1777,6 +1847,15 @@ function ArenaStories() {
                   Select a starting hour below. Then choose how many consecutive hours to book.
                 </p>
 
+                {activeSlots.some((s) => s.slot_date !== activeDate) && (
+                  <div className="mt-4 flex items-center gap-2.5 rounded-sm border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 text-xs text-emerald-400">
+                    <Moon className="h-4 w-4 shrink-0 text-emerald-400" />
+                    <span>
+                      <strong>Overnight Match Slots (12:00 AM – 6:00 AM)</strong> are open! Play past midnight as part of this match session.
+                    </span>
+                  </div>
+                )}
+
                 {/* Slot grid */}
                 <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {activeSlots.length === 0 ? (
@@ -1793,6 +1872,7 @@ function ArenaStories() {
                       const selected = selectedSlots.some(
                         (selectedSlot) => selectedSlot.id === slot.id,
                       );
+                      const isOvernight = slot.slot_date !== activeDate;
                       return (
                         <Button
                           key={slot.id}
@@ -1802,15 +1882,17 @@ function ArenaStories() {
                           aria-pressed={selected}
                           title={
                             isBooked
-                              ? `${formatSlotRange(slot.start_time, slot.duration_minutes ?? 60)} (${slot.status === "held" ? "Approval pending" : "Booked"})`
-                              : undefined
+                              ? `${formatSlotRange(slot.start_time, slot.duration_minutes ?? 60)} (${slot.status === "held" ? "Approval pending" : "Booked"})${isOvernight ? ` · Next Day (${getSlotDayLabel(slot, activeDate)})` : ""}`
+                              : `${formatSlotRange(slot.start_time, slot.duration_minutes ?? 60)}${isOvernight ? ` · Next Day (${getSlotDayLabel(slot, activeDate)})` : ""}`
                           }
                           className={`h-20 min-w-0 flex-col gap-0.5 overflow-hidden px-1.5 sm:h-16 ${
                             selected ? "ring-2 ring-primary ring-offset-2" : ""
                           } ${
                             isBooked
                               ? "border-rose-500/30 bg-rose-500/5 disabled:opacity-85 cursor-not-allowed"
-                              : ""
+                              : isOvernight && !selected
+                                ? "border-emerald-500/30 bg-emerald-500/5"
+                                : ""
                           }`}
                           onClick={() => selectSlot(slot)}
                         >
@@ -1820,6 +1902,7 @@ function ArenaStories() {
                             }`}
                           >
                             {formatSlotRange(slot.start_time, slot.duration_minutes ?? 60)}
+                            {isOvernight ? ` (+1 ${getSlotDayLabel(slot, activeDate)})` : ""}
                           </span>
                           {venue.booking_enabled && (
                             <span
@@ -1847,7 +1930,9 @@ function ArenaStories() {
                                     ? "Limited availability"
                                     : selected
                                       ? "Selected"
-                                      : "Available"}
+                                      : isOvernight
+                                        ? "Available · Overnight"
+                                        : "Available"}
                           </span>
                         </Button>
                       );
@@ -1876,15 +1961,23 @@ function ArenaStories() {
                         className="h-12 w-full min-[480px]:w-auto min-[480px]:min-w-48 border border-input bg-background px-4 font-bold outline-hidden focus:border-primary text-xs sm:text-sm"
                       >
                         {Array.from({ length: maxDuration }, (_, index) => index + 1).map(
-                          (hours) => (
-                            <option key={hours} value={hours}>
-                              {hours} hour{hours === 1 ? "" : "s"} ({formatSlotRange(chosenSlot.start_time, hours * 60)}) — ₹
-                              {getBookingPrice(
-                                venue,
-                                activeSlots.slice(chosenSlotIndex, chosenSlotIndex + hours),
-                              )}
-                            </option>
-                          ),
+                          (hours) => {
+                            const endSlot = activeSlots[chosenSlotIndex + hours - 1];
+                            const crossesMidnight = endSlot && endSlot.slot_date !== chosenSlot.slot_date;
+                            return (
+                              <option key={hours} value={hours}>
+                                {hours} hour{hours === 1 ? "" : "s"} (
+                                {getSlotStartTime(chosenSlot.start_time)} to{" "}
+                                {getSlotEndTime(chosenSlot.start_time, hours * 60)}
+                                {crossesMidnight ? ` +1 Day (${getSlotDayLabel(endSlot, activeDate)})` : ""}
+                                ) — ₹
+                                {getBookingPrice(
+                                  venue,
+                                  activeSlots.slice(chosenSlotIndex, chosenSlotIndex + hours),
+                                )}
+                              </option>
+                            );
+                          },
                         )}
                       </select>
                     </div>
@@ -2294,13 +2387,27 @@ function ArenaStories() {
                       />
                       <Summary
                         label="Date"
-                        value={activeDate ? formatDay(activeDate) : "Select a date"}
+                        value={
+                          activeDate
+                            ? `${formatDay(activeDate)}${
+                                chosenSlot && chosenSlot.slot_date !== activeDate
+                                  ? ` (${getSlotDayLabel(chosenSlot, activeDate)} late night)`
+                                  : ""
+                              }`
+                            : "Select a date"
+                        }
                       />
                       <Summary
                         label="Kick-off"
                         value={
                           chosenSlot
-                            ? `${formatSlotRange(chosenSlot.start_time, durationHours * 60)} (${durationHours} hour${durationHours === 1 ? "" : "s"})`
+                            ? `${formatSlotRange(chosenSlot.start_time, durationHours * 60)} (${durationHours} hour${durationHours === 1 ? "" : "s"})${
+                                chosenSlot.slot_date !== activeDate
+                                  ? ` · Overnight (+1 Day)`
+                                  : selectedSlots.some((s) => s.slot_date !== activeDate)
+                                    ? ` · Crosses midnight (+1 Day)`
+                                    : ""
+                              }`
                             : "Select a slot"
                         }
                       />
